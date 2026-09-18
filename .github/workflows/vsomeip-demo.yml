@@ -26,8 +26,8 @@ jobs:
         run: |
           set -e -o pipefail
           exec > >(tee /tmp/vsomeip-build.log) 2>&1
-          echo "== downloading vsomeip v3.5.0 (codeload) =="
-          curl -fsSL https://codeload.github.com/COVESA/vsomeip/tar.gz/refs/tags/v3.5.0 -o /tmp/vsomeip.tgz
+          echo "== downloading vsomeip v3.5.0 (archive) =="
+          curl -fsSL https://github.com/COVESA/vsomeip/archive/refs/tags/v3.5.0.tar.gz -o /tmp/vsomeip.tgz
           mkdir -p /tmp/vsomeip-src
           tar -xzf /tmp/vsomeip.tgz -C /tmp/vsomeip-src --strip-components=1
           echo "== configuring vsomeip =="
