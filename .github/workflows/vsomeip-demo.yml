@@ -1,0 +1,40 @@
+name: vsomeip-demo
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vsomeip_demo/**'
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install libvsomeip-dev
+        run: sudo apt-get update && sudo apt-get install -y libvsomeip-dev
+
+      - name: Build
+        working-directory: vsomeip_demo
+        run: cmake -S . -B build && cmake --build build -j"$(nproc)"
+
+      - name: Run service + client
+        working-directory: vsomeip_demo
+        run: |
+          export VSOMEIP_CONFIGURATION=$PWD/vsomeip.json
+          ./build/service > /tmp/service.log 2>&1 &
+          SVC=$!
+          sleep 4
+          timeout 15 ./build/client | tee /tmp/client.log
+          kill $SVC 2>/dev/null || true
+          cat /tmp/service.log
+
+      - name: Assert results
+        run: |
+          grep -q "is available" /tmp/client.log || (echo "FAIL: availability" && exit 1)
+          grep -q "GetVersion" /tmp/client.log || (echo "FAIL: GetVersion" && exit 1)
+          grep -q "value=7" /tmp/client.log || (echo "FAIL: Add(3,4)" && exit 1)
+          grep -q "value=88" /tmp/client.log || (echo "FAIL: Speed=88" && exit 1)
+          grep -q "event 0x8001" /tmp/client.log || (echo "FAIL: event" && exit 1)
+          echo "ALL CHECKS PASSED"

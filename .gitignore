@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+bin/
+build/
+*.o
+*.a
+*.so
+.DS_Store
+.idea/caches/
+.idea/workspace.xml

@@ -1,0 +1,18 @@
+{
+    "unicast": "127.0.0.1",
+    "service-discovery": {
+        "enable": true,
+        "multicast": "224.244.224.245"
+    },
+    "services": [
+        {
+            "service": "0x1234",
+            "instance": "0x5678",
+            "unreliable": "30500"
+        }
+    ],
+    "applications": [
+        { "name": "someip-service", "port": "30500" },
+        { "name": "someip-client",  "port": "30501" }
+    ]
+}

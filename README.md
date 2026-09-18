@@ -1,6 +1,6 @@
 # SOME-IP Demo
 
-车机以太网 SOME/IP 服务发布示例，同一 Service 定义用两种技术栈实现，可跨栈互操作。
+车机以太网 SOME/IP 服务发布示例，同一 Service 定义用**三种技术栈**实现：两套零依赖手写实现可跨栈互操作，另附量产级 vsomeip 版本（云端/容器运行）。
 
 - Service: `0x1234/0x5678`（Major v1.0，Minor 0x00000001）
 - Method: `GetVersion(0x0001)`、`Add(0x0002)`
@@ -8,14 +8,15 @@
 - Event: `Status(0x8001)`，EventGroup `0x0001`
 - UDP：method `30500`，event `30501`，SD 组播 `224.244.224.245:30490`
 
-## 两个实现
+## 三个实现
 
 | 目录 | 技术栈 | 特点 |
 | --- | --- | --- |
-| `someip_demo/` | 纯 Python（零依赖） | 面向快速原型、学习协议 |
-| `someip_demo_cpp/` | C++11（仅系统 socket，零依赖） | 更贴近量产方向，可直接嵌入 |
+| `someip_demo/` | 纯 Python（零依赖） | 面向快速原型、学习协议，本机直接跑 |
+| `someip_demo_cpp/` | C++11（仅系统 socket，零依赖） | 更贴近量产方向，本机直接跑 |
+| `vsomeip_demo/` | C++17 + vsomeip（COVESA 标准栈） | 量产级：完整 SD 状态机/TP/TCP，Linux |
 
-各自的构建/运行/测试说明见子目录 README（`someip_demo/README.md`、`someip_demo_cpp/README.md`）。
+各自构建/运行/测试说明见子目录 README（`someip_demo/README.md`、`someip_demo_cpp/README.md`、`vsomeip_demo/README.md`）。
 
 ## 跨栈互操作（已验证）
 
