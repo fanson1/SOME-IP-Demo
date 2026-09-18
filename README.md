@@ -14,9 +14,14 @@
 | --- | --- | --- |
 | `someip_demo/` | 纯 Python（零依赖） | 面向快速原型、学习协议，本机直接跑 |
 | `someip_demo_cpp/` | C++11（仅系统 socket，零依赖） | 更贴近量产方向，本机直接跑 |
-| `vsomeip_demo/` | C++17 + vsomeip（COVESA 标准栈） | 量产级：完整 SD 状态机/TP/TCP，Linux |
+| `vsomeip_demo/` | C++17 + vsomeip（COVESA 标准栈） | 量产级：完整 SD 状态机/TP/TCP，Linux（云端验证） |
 
-各自构建/运行/测试说明见子目录 README（`someip_demo/README.md`、`someip_demo_cpp/README.md`、`vsomeip_demo/README.md`）。
+## 自研 v2（进行中，量产方向）
+
+`docs/v2-architecture.md` 定义了分层升级计划：在 v1 基础上补齐 SD 完整状态机、
+SOME/IP-TP、TCP 通道、AUTOSAR 序列化、性能基准，双实现字节级互操作。
+- Python v2：`someip_demo/someip2/`（wire/ser 已落地，`tests/test_py_wire.py` 等通过）
+- C++ v2：`someip_demo_cpp_v2/`（wire/ser 已落地，`make test` 通过）
 
 ## 跨栈互操作（已验证）
 
