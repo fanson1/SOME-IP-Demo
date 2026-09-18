@@ -17,6 +17,14 @@ struct MessageType {
     static constexpr uint8_t ERROR             = 0x81;
 };
 
+struct TpFlag {
+    static constexpr uint8_t TP_REQUEST           = 0x20;
+    static constexpr uint8_t TP_RESPONSE          = 0x21;
+    static constexpr uint8_t TP_ERROR             = 0x22;
+    static constexpr uint8_t TP_NOTIFICATION      = 0x23;
+    static constexpr uint8_t TP_REQUEST_NO_RETURN = 0x24;
+};
+
 struct ReturnCode {
     static constexpr uint8_t E_OK                     = 0x00;
     static constexpr uint8_t E_NOT_OK                 = 0x01;

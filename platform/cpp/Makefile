@@ -4,13 +4,14 @@ CXX ?= c++
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -Iinclude -pthread
 
 EXAMPLES = bin/service_demo bin/client_demo
-TESTS    = build/test_wire_ser build/test_transport
+TESTS    = build/test_wire_ser build/test_transport build/test_tpc
 
 all: $(EXAMPLES)
 
 test: $(TESTS)
 	./build/test_wire_ser
 	./build/test_transport
+	./build/test_tpc
 
 bin/service_demo: examples/service_demo.cpp include/someip/legacy/someip.hpp include/someip/legacy/sd.hpp include/someip/legacy/net.hpp
 	@mkdir -p bin
@@ -27,6 +28,10 @@ build/test_wire_ser: tests/test_wire_ser.cpp include/someip/wire.hpp include/som
 build/test_transport: tests/test_transport.cpp include/someip/transport.hpp include/someip/wire.hpp include/someip/types.hpp
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -o $@ tests/test_transport.cpp
+
+build/test_tpc: tests/test_tpc.cpp include/someip/tpc.hpp include/someip/wire.hpp include/someip/types.hpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -o $@ tests/test_tpc.cpp
 
 clean:
 	rm -rf bin build
