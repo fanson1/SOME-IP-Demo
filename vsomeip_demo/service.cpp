@@ -118,32 +118,36 @@ static void on_message(const std::shared_ptr<vsomeip::message> &request) {
     g_app->send(response);
 }
 
+static void on_state(vsomeip::state_type_e state) {
+    if (state == vsomeip::state_type_e::ST_REGISTERED) {
+        g_app->offer_event(SERVICE_ID, INSTANCE_ID, EVENT_STATUS,
+                           {EVENTGROUP_MAIN}, vsomeip::event_type_e::ET_EVENT);
+        g_app->offer_event(SERVICE_ID, INSTANCE_ID, FIELD_SPEED + 2,
+                           {EVENTGROUP_MAIN}, vsomeip::event_type_e::ET_EVENT);
+        g_app->offer_service(SERVICE_ID, INSTANCE_ID);
+        printf("vsomeip service: 0x%04X/0x%04X offered\n", SERVICE_ID, INSTANCE_ID);
+        std::thread publisher([] {
+            while (true) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+                publish_status();
+                publish_speed();
+            }
+        });
+        publisher.detach();
+    }
+}
+
 int main() {
     g_app = vsomeip::runtime::get()->create_application("someip-service");
     if (!g_app->init()) {
         fprintf(stderr, "vsomeip init failed\n");
         return 1;
     }
+    g_app->register_state_handler(on_state);
     g_app->register_message_handler(SERVICE_ID, INSTANCE_ID, METHOD_GET_VERSION, on_message);
     g_app->register_message_handler(SERVICE_ID, INSTANCE_ID, METHOD_ADD, on_message);
     g_app->register_message_handler(SERVICE_ID, INSTANCE_ID, FIELD_SPEED, on_message);
     g_app->register_message_handler(SERVICE_ID, INSTANCE_ID, FIELD_SPEED + 1, on_message);
-
-    g_app->offer_event(SERVICE_ID, INSTANCE_ID, EVENT_STATUS,
-                       {EVENTGROUP_MAIN}, vsomeip::event_type_e::ET_EVENT);
-    g_app->offer_event(SERVICE_ID, INSTANCE_ID, FIELD_SPEED + 2,
-                       {EVENTGROUP_MAIN}, vsomeip::event_type_e::ET_EVENT);
-    g_app->offer_service(SERVICE_ID, INSTANCE_ID);
-
-    printf("vsomeip service: 0x%04X/0x%04X offered\n", SERVICE_ID, INSTANCE_ID);
-    std::thread publisher([] {
-        while (true) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            publish_status();
-            publish_speed();
-        }
-    });
-    publisher.detach();
 
     g_app->start();
     return 0;

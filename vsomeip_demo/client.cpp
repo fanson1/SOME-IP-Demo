@@ -113,6 +113,12 @@ static void on_availability(vsomeip::service_t service, vsomeip::instance_t inst
     }
 }
 
+static void on_state(vsomeip::state_type_e state) {
+    if (state == vsomeip::state_type_e::ST_REGISTERED) {
+        g_app->request_service(SERVICE_ID, INSTANCE_ID);
+    }
+}
+
 int main() {
     setvbuf(stdout, nullptr, _IONBF, 0);
     g_app = vsomeip::runtime::get()->create_application("someip-client");
@@ -120,10 +126,10 @@ int main() {
         fprintf(stderr, "vsomeip init failed\n");
         return 1;
     }
+    g_app->register_state_handler(on_state);
     g_app->register_message_handler(vsomeip::ANY_SERVICE, INSTANCE_ID,
                                     vsomeip::ANY_METHOD, on_any_message);
     g_app->register_availability_handler(SERVICE_ID, INSTANCE_ID, on_availability);
-    g_app->request_service(SERVICE_ID, INSTANCE_ID);
 
     g_app->start();
     return 0;

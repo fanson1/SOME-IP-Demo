@@ -89,6 +89,8 @@ jobs:
 
       - name: Assert results
         run: |
+          echo "===== client.log ====="
+          cat /tmp/client.log
           grep -q "is available" /tmp/client.log || { echo "FAIL: availability"; exit 1; }
           grep -q "GetVersion" /tmp/client.log || { echo "FAIL: GetVersion"; exit 1; }
           grep -q "value=7" /tmp/client.log || { echo "FAIL: Add(3,4)"; exit 1; }
