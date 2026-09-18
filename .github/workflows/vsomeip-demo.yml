@@ -10,6 +10,9 @@ on:
 jobs:
   build-and-run:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
 
@@ -21,15 +24,23 @@ jobs:
 
       - name: Build & install vsomeip (v3.5.0, no tests)
         run: |
-          git clone --depth 1 --branch v3.5.0 \
-            https://github.com/COVESA/vsomeip /tmp/vsomeip
-          cmake -S /tmp/vsomeip -B /tmp/vsomeip/build \
+          set -e -o pipefail
+          exec > >(tee /tmp/vsomeip-build.log) 2>&1
+          echo "== downloading vsomeip v3.5.0 (codeload) =="
+          curl -fsSL https://codeload.github.com/COVESA/vsomeip/tar.gz/refs/tags/v3.5.0 -o /tmp/vsomeip.tgz
+          mkdir -p /tmp/vsomeip-src
+          tar -xzf /tmp/vsomeip.tgz -C /tmp/vsomeip-src --strip-components=1
+          echo "== configuring vsomeip =="
+          cmake -S /tmp/vsomeip-src -B /tmp/vsomeip-src/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DENABLE_SIGNAL_HANDLING=ON \
             -DDIAGNOSIS_ADDRESS=0x10 \
             -DCMAKE_INSTALL_PREFIX=/tmp/vsomeip/dist
-          cmake --build /tmp/vsomeip/build -j"$(nproc)"
-          cmake --install /tmp/vsomeip/build
+          echo "== building vsomeip =="
+          cmake --build /tmp/vsomeip-src/build -j"$(nproc)"
+          echo "== installing vsomeip =="
+          cmake --install /tmp/vsomeip-src/build
+          touch /tmp/build_ok
 
       - name: Build demo (service + client)
         run: |
@@ -49,6 +60,21 @@ jobs:
           kill $SVC 2>/dev/null || true
           echo "===== service.log ====="
           cat /tmp/service.log
+
+      - name: Publish build failure log (debug)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f /tmp/build_ok ] && [ -s /tmp/vsomeip-build.log ]; then
+            { echo "## vsomeip build failed (run ${{ github.run_id }}/${{ github.run_attempt }})"
+              echo '```text'
+              tail -c 30000 /tmp/vsomeip-build.log
+              echo '```'; } > /tmp/body.md
+            gh issue create --repo "${GITHUB_REPOSITORY}" \
+              --title "vsomeip build debug (${{ github.run_id }}/${{ github.run_attempt }})" \
+              --body-file /tmp/body.md
+          fi
 
       - name: Assert results
         run: |
