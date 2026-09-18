@@ -66,7 +66,7 @@ static void on_response(const std::shared_ptr<vsomeip::message> &response) {
     read_u32(response->get_payload()->get_data(),
              response->get_payload()->get_length(), 0, result);
     printf("  [resp 0x%04X] %-10s rc=0x%02X value=%u\n",
-           method, name, response->get_return_code(), result);
+           method, name, static_cast<unsigned int>(response->get_return_code()), result);
 }
 
 static void on_event(const std::shared_ptr<vsomeip::message> &notification) {

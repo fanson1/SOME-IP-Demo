@@ -3,6 +3,7 @@
 // demos (Service 0x1234/0x5678, EventGroup 0x0001).
 #include <vsomeip/vsomeip.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
