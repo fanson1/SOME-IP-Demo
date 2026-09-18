@@ -38,7 +38,7 @@ docker run --rm --network host -e VSOMEIP_CONFIGURATION=/app/vsomeip.json someip
 ```bash
 sudo apt install -y build-essential cmake git \
     libboost-dev libboost-system-dev libboost-filesystem-dev libboost-thread-dev
-git clone --depth 1 --branch v3.5.0 https://github.com/COVESA/vsomeip /tmp/vsomeip
+git clone --depth 1 --branch 3.7.6 https://github.com/COVESA/vsomeip /tmp/vsomeip
 cmake -S /tmp/vsomeip -B /tmp/vsomeip/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
 cmake --build /tmp/vsomeip/build -j && sudo cmake --install /tmp/vsomeip/build
 cd vsomeip_demo
@@ -66,7 +66,7 @@ Service 0x1234/0x5678 is available
 - 本仓库开发机为 Intel macOS 12 + Homebrew，**官方仅支持 vsomeip 在 Linux/Android/Windows 构建**；
   Homebrew 在本机无 bottle（走源码构建需升级 CLT），且本机访问 GitHub 大文件约 10KB/s，
   因此采用 **云端/容器** 作为执行环境。
-- Ubuntu 官方仓库**未打包** vsomeip（Debian 有），故 Docker/Actions 均改为先 **git clone vsomeip v3.5.0 源码编译安装**，再编译本 demo。
+- Ubuntu 官方仓库**未打包** vsomeip（Debian 有），故 Docker/Actions 均改为先 **git clone vsomeip 3.7.6 源码编译安装**，再编译本 demo。
 
 ## 与手写实现的关系
 

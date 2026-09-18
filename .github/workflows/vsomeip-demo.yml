@@ -20,14 +20,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake git \
-            libboost-dev libboost-system-dev libboost-filesystem-dev libboost-thread-dev
+            libboost-dev libboost-system-dev libboost-filesystem-dev libboost-thread-dev libdbus-1-dev
 
-      - name: Build & install vsomeip (v3.5.0, no tests)
+      - name: Build & install vsomeip (3.7.6, no tests)
         run: |
           set -e -o pipefail
           exec > >(tee /tmp/vsomeip-build.log) 2>&1
-          echo "== downloading vsomeip v3.5.0 (archive) =="
-          curl -fsSL https://github.com/COVESA/vsomeip/archive/refs/tags/v3.5.0.tar.gz -o /tmp/vsomeip.tgz
+          echo "== downloading vsomeip 3.7.6 (archive) =="
+          curl -fsSL https://github.com/COVESA/vsomeip/archive/refs/tags/3.7.6.tar.gz -o /tmp/vsomeip.tgz
           mkdir -p /tmp/vsomeip-src
           tar -xzf /tmp/vsomeip.tgz -C /tmp/vsomeip-src --strip-components=1
           echo "== configuring vsomeip =="
