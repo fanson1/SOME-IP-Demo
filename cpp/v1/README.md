@@ -1,6 +1,6 @@
 # SOME/IP Demo - C++ 实现
 
-纯 C++（C++11，仅系统 socket API，零第三方依赖）的 SOME/IP 服务发布实现，与 `../someip_demo`（纯 Python）同协议并存，可跨语言互操作。
+纯 C++（C++11，仅系统 socket API，零第三方依赖）的 SOME/IP 服务发布实现，与 `../python`（纯 Python）同协议并存，可跨语言互操作。
 
 ## 特性
 
@@ -14,7 +14,7 @@
 ## 构建
 
 ```bash
-cd someip_demo_cpp
+cd cpp/v1
 make            # 生成 bin/service_demo、bin/client_demo
 make clean
 ```
@@ -34,15 +34,15 @@ make clean
 
 | 服务方 | 客户端 | 结果 |
 | --- | --- | --- |
-| `bin/service_demo` | `someip_demo/client_demo.py` | 通过 |
-| `someip_demo/service_demo.py` | `bin/client_demo` | 通过 |
+| `bin/service_demo` | `python/client_demo.py` | 通过 |
+| `python/service_demo.py` | `bin/client_demo` | 通过 |
 
 验证项与 Python 版一致：SD 发现、GetVersion、Add(3+4=7)、Speed 读改 88、事件/通知接收。
 
 ## 文件结构
 
 ```
-someip_demo_cpp/
+cpp/v1/
 ├── Makefile
 ├── someip.hpp      # SOME/IP 消息头编解码 + 基础工具
 ├── sd.hpp          # Service Discovery 报文（entries/options）

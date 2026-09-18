@@ -18,18 +18,24 @@
 ## 目录结构
 
 ```
-someip_demo/
-├── someip/                  # SOME/IP 协议栈
+python/                    # 全部 Python 实现（v1 协议栈 + demos，v2 升级栈）
+├── someip/                # v1 SOME/IP 协议栈（兼容/最简参考）
 │   ├── __init__.py
-│   ├── constants.py         # 消息类型 / 返回码 / SD 常量
-│   ├── header.py            # SOME/IP 消息头编解码
-│   ├── sd.py                # Service Discovery 报文（Entries/Options）
-│   ├── net.py               # UDP / Multicast socket 封装
-│   ├── service.py           # SomeIpService（服务端）
-│   └── client.py            # SomeIpClient（客户端）
-├── service_demo.py          # 示例服务：发布 Method + Field + Event
-└── client_demo.py           # 示例客户端：发现 + 调用 + 订阅
+│   ├── constants.py       # 消息类型 / 返回码 / SD 常量
+│   ├── header.py          # SOME/IP 消息头编解码
+│   ├── sd.py              # Service Discovery 报文（Entries/Options）
+│   ├── net.py             # UDP / Multicast socket 封装
+│   ├── service.py         # SomeIpService（服务端）
+│   └── client.py          # SomeIpClient（客户端）
+├── someip2/               # v2 升级栈（面向量产方向，与 v1 字节兼容）
+│   ├── types.py           # 类型 / 常量
+│   ├── wire.py            # 报文头编解码（带强制校验）
+│   └── ser.py             # AUTOSAR wire format 序列化
+├── service_demo.py        # v1 示例服务：发布 Method + Field + Event
+└── client_demo.py         # v1 示例客户端：发现 + 调用 + 订阅
 ```
+
+v2 进度与分层见 `../docs/v2-architecture.md`；C++ 对照实现见 `../cpp/`。
 
 ## 环境要求
 
@@ -42,7 +48,7 @@ someip_demo/
 两个终端分别运行：
 
 ```bash
-cd someip_demo
+cd python
 
 # 终端 1：启动服务（发布方）
 python3 service_demo.py

@@ -7,7 +7,7 @@ import unittest
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
-sys.path.insert(0, os.path.join(_ROOT, "someip_demo"))
+sys.path.insert(0, os.path.join(_ROOT, "python"))
 
 from someip2.ser import Writer, Reader
 from someip2.types import MalformedMessage

@@ -5,7 +5,7 @@ on:
   push:
     paths:
       - '.github/workflows/vsomeip-demo.yml'
-      - 'vsomeip_demo/**'
+      - 'vsomeip/**'
 
 jobs:
   build-and-run:
@@ -46,14 +46,14 @@ jobs:
         run: |
           set -e -o pipefail
           exec > >(tee /tmp/demo-build.log) 2>&1
-          cmake -S vsomeip_demo -B vsomeip_demo/build \
+          cmake -S vsomeip -B vsomeip/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH=/tmp/vsomeip/dist
-          cmake --build vsomeip_demo/build -j"$(nproc)"
+          cmake --build vsomeip/build -j"$(nproc)"
           touch /tmp/demo_ok
 
       - name: Run service + client
-        working-directory: vsomeip_demo
+        working-directory: vsomeip
         run: |
           export VSOMEIP_CONFIGURATION=$PWD/vsomeip.json
           ./build/service > /tmp/service.log 2>&1 &

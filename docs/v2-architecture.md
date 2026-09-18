@@ -1,6 +1,6 @@
 # SOME/IP 自研栈 v2 —— 架构设计
 
-> 目标：把已验证的 v1（`someip_demo/` Python + `someip_demo_cpp/` C++11）
+> 目标：把已验证的 v1（`python/someip/` Python + `cpp/v1/` C++11）
 > 升级为**面向量产方向的自研 SOME/IP 栈**，双实现字节级互操作，
 > 覆盖 vsomeip 生产特性的核心子集，并以互操作矩阵 + 性能基准持续回归。
 
@@ -43,13 +43,17 @@ DBus/管理接口。这些依赖环境或需整车集成，自研纯栈仅提供
 ### 目录约定
 
 ```
-someip_demo/someip2/          # Python v2（零第三方依赖）
+python/someip2/               # Python v2（零第三方依赖）
   types.py wire.py ser.py transport.py tpc.py sdm.py app.py config.py log.py xutil.py
-someip_demo_cpp_v2/           # C++ v2（C++17，零第三方依赖，POSIX）
-  include/someip2/*.h  src/*.cpp  tests/  Makefile(tests)  CMakeLists.tes
-tests/ 互操作与单测脚本（tests/run_interop_matrix.sh）
-bench/ 性能基准（bench/bench_rpc.py + bench_report）
+cpp/v2/                       # C++ v2（C++17，零第三方依赖，POSIX）
+  include/someip2/*.h  src/*.cpp  tests/  Makefile(tests)  CMakeLists.txt
+tests/  互操作与单测脚本（tests/run_interop_matrix.sh）
+scripts/ 一键全面测试（scripts/run_all.sh）
+bench/  性能基准（bench/bench_rpc.py + bench_report）
 ```
+
+统一布局（v1/v2 均归入同语言的 `python/` / `cpp/` 目录，`vsomeip/` 为量产对照，
+详见根 README「仓库布局」）。
 
 ## 3. 兼容红线（字节级互操作保证）
 
