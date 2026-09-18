@@ -17,7 +17,7 @@ vsomeip_demo/
 ├── client.cpp       # 订阅方：SD 发现 -> RPC -> 订阅事件
 ├── vsomeip.json     # 单机配置（unicast 127.0.0.1 + SD multicast）
 ├── CMakeLists.txt
-├── Dockerfile       # Ubuntu 24.04 + libvsomeip-dev 一键构建
+├── Dockerfile       # Ubuntu 24.04：apt 依赖 + 源码编译 vsomeip + 构建 demo
 └── ../.github/workflows/vsomeip-demo.yml  # 云端自动构建+断言
 ```
 
@@ -29,14 +29,18 @@ vsomeip_demo/
 
 ### 2. Docker
 ```bash
-docker build -t someip-demo vsomeip_demo
+docker build -t someip-demo vsomeip_demo   # 镜像内含源码编译的 vsomeip
 docker run --rm someip-demo ./build/service &     # 终端1
 docker run --rm --network host -e VSOMEIP_CONFIGURATION=/app/vsomeip.json someip-demo ./build/client  # 终端2
 ```
 
-### 3. 原生 Ubuntu
+### 3. 原生 Ubuntu（vsomeip 需源码编译，Ubuntu 官方未打包 libvsomeip-dev）
 ```bash
-sudo apt install -y build-essential cmake libvsomeip-dev
+sudo apt install -y build-essential cmake git \
+    libboost-dev libboost-system-dev libboost-filesystem-dev libboost-thread-dev
+git clone --depth 1 --branch v3.5.0 https://github.com/COVESA/vsomeip /tmp/vsomeip
+cmake -S /tmp/vsomeip -B /tmp/vsomeip/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
+cmake --build /tmp/vsomeip/build -j && sudo cmake --install /tmp/vsomeip/build
 cd vsomeip_demo
 cmake -S . -B build && cmake --build build
 export VSOMEIP_CONFIGURATION=$PWD/vsomeip.json
@@ -62,7 +66,7 @@ Service 0x1234/0x5678 is available
 - 本仓库开发机为 Intel macOS 12 + Homebrew，**官方仅支持 vsomeip 在 Linux/Android/Windows 构建**；
   Homebrew 在本机无 bottle（走源码构建需升级 CLT），且本机访问 GitHub 大文件约 10KB/s，
   因此采用 **云端/容器** 作为执行环境。
-- 代码路径已按 Ubuntu 24.04 `libvsomeip-dev` 对齐（库名 `vsomeip3`/`vsomeip3-sd`）。
+- Ubuntu 官方仓库**未打包** vsomeip（Debian 有），故 Docker/Actions 均改为先 **git clone vsomeip v3.5.0 源码编译安装**，再编译本 demo。
 
 ## 与手写实现的关系
 

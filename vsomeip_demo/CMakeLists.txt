@@ -24,7 +24,7 @@ else()
     endif()
     set(VSOMEIP_TARGETS ${VSOMEIP_CORE_LIB} ${VSOMEIP_SD_LIB} Threads::Threads dl)
     find_path(VSOMEIP_INCLUDE_DIR vsomeip/vsomeip.hpp
-              HINTS /usr/include /usr/local/include)
+              HINTS ${CMAKE_PREFIX_PATH}/include /usr/include /usr/local/include)
     include_directories(${VSOMEIP_INCLUDE_DIR})
 endif()
 
