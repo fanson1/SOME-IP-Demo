@@ -44,10 +44,13 @@ jobs:
 
       - name: Build demo (service + client)
         run: |
+          set -e -o pipefail
+          exec > >(tee /tmp/demo-build.log) 2>&1
           cmake -S vsomeip_demo -B vsomeip_demo/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH=/tmp/vsomeip/dist
           cmake --build vsomeip_demo/build -j"$(nproc)"
+          touch /tmp/demo_ok
 
       - name: Run service + client
         working-directory: vsomeip_demo
@@ -66,7 +69,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ ! -f /tmp/build_ok ] && [ -s /tmp/vsomeip-build.log ]; then
+          if [ ! -f /tmp/demo_ok ] && [ -s /tmp/demo-build.log ]; then
+            { echo "## demo build failed (run ${{ github.run_id }}/${{ github.run_attempt }})"
+              echo '```text'
+              tail -c 30000 /tmp/demo-build.log
+              echo '```'; } > /tmp/body.md
+            gh issue create --repo "${GITHUB_REPOSITORY}" \
+              --title "demo build debug (${{ github.run_id }}/${{ github.run_attempt }})" \
+              --body-file /tmp/body.md
+          elif [ ! -f /tmp/build_ok ] && [ -s /tmp/vsomeip-build.log ]; then
             { echo "## vsomeip build failed (run ${{ github.run_id }}/${{ github.run_attempt }})"
               echo '```text'
               tail -c 30000 /tmp/vsomeip-build.log

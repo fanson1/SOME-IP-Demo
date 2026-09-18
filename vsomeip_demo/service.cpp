@@ -23,8 +23,25 @@ static std::atomic<uint32_t> g_speed{0};
 
 static std::shared_ptr<vsomeip::payload> make_u32_payload(uint32_t value) {
     auto payload = vsomeip::runtime::get()->create_payload();
-    payload->set_uint32_data({value});
+    std::vector<vsomeip::byte_t> bytes{
+        static_cast<vsomeip::byte_t>(value >> 24),
+        static_cast<vsomeip::byte_t>(value >> 16),
+        static_cast<vsomeip::byte_t>(value >> 8),
+        static_cast<vsomeip::byte_t>(value)};
+    payload->set_data(bytes);
     return payload;
+}
+
+static bool read_u32(const vsomeip::byte_t *data, size_t length,
+                     size_t offset, uint32_t &out) {
+    if (offset + 4 > length) {
+        return false;
+    }
+    out = static_cast<uint32_t>(data[offset]) << 24 |
+          static_cast<uint32_t>(data[offset + 1]) << 16 |
+          static_cast<uint32_t>(data[offset + 2]) << 8 |
+          static_cast<uint32_t>(data[offset + 3]);
+    return true;
 }
 
 static void publish_speed() {
@@ -36,7 +53,7 @@ static void publish_status() {
     auto payload = vsomeip::runtime::get()->create_payload();
     std::vector<vsomeip::byte_t> raw;
     uint32_t ts = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(
-                   std::chrono::system_clock::now().time_since_epoch()).count());
+                    std::chrono::system_clock::now().time_since_epoch()).count());
     raw.push_back(static_cast<vsomeip::byte_t>(ts >> 24));
     raw.push_back(static_cast<vsomeip::byte_t>(ts >> 16));
     raw.push_back(static_cast<vsomeip::byte_t>(ts >> 8));
@@ -56,29 +73,32 @@ static void on_message(const std::shared_ptr<vsomeip::message> &request) {
     std::shared_ptr<vsomeip::payload> response_payload;
     vsomeip::return_code_e rc = vsomeip::return_code_e::E_OK;
 
+    const vsomeip::byte_t *data = request->get_payload()->get_data();
+    size_t length = request->get_payload()->get_length();
+
     switch (method) {
         case METHOD_GET_VERSION:
             response_payload = make_u32_payload(0x01000000u);
             break;
         case METHOD_ADD: {
-            auto data = request->get_payload()->get_uint32_data();
-            if (data.size() < 2) {
+            uint32_t a = 0, b = 0;
+            if (!read_u32(data, length, 0, a) || !read_u32(data, length, 4, b)) {
                 rc = vsomeip::return_code_e::E_MALFORMED_MESSAGE;
                 break;
             }
-            response_payload = make_u32_payload(data[0] + data[1]);
+            response_payload = make_u32_payload(a + b);
             break;
         }
         case FIELD_SPEED:
             response_payload = make_u32_payload(g_speed.load());
             break;
         case FIELD_SPEED + 1: {
-            auto data = request->get_payload()->get_uint32_data();
-            if (data.empty()) {
+            uint32_t value = 0;
+            if (!read_u32(data, length, 0, value)) {
                 rc = vsomeip::return_code_e::E_MALFORMED_MESSAGE;
                 break;
             }
-            g_speed = data[0];
+            g_speed = value;
             response_payload = make_u32_payload(g_speed.load());
             publish_speed();
             break;

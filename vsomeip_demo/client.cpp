@@ -1,7 +1,9 @@
 // vsomeip client: discovers the service via SD, calls Method / Field RPCs
-// and receives Event / Field notifications.
+// and receives Event / Field notifications. Events arrive via the generic
+// message handler (vsomeip >= 3.7 dropped register_event_handler).
 #include <vsomeip/vsomeip.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -28,36 +30,66 @@ static void send_request(vsomeip::method_t method,
     request->set_method(method);
     if (!args.empty()) {
         auto payload = vsomeip::runtime::get()->create_payload();
-        payload->set_uint32_data(args);
+        std::vector<vsomeip::byte_t> bytes;
+        for (uint32_t value : args) {
+            bytes.push_back(static_cast<vsomeip::byte_t>(value >> 24));
+            bytes.push_back(static_cast<vsomeip::byte_t>(value >> 16));
+            bytes.push_back(static_cast<vsomeip::byte_t>(value >> 8));
+            bytes.push_back(static_cast<vsomeip::byte_t>(value));
+        }
+        payload->set_data(bytes);
         request->set_payload(payload);
     }
     g_app->send(request);
 }
 
+static bool read_u32(const vsomeip::byte_t *data, size_t length,
+                     size_t offset, uint32_t &out) {
+    if (offset + 4 > length) {
+        return false;
+    }
+    out = static_cast<uint32_t>(data[offset]) << 24 |
+          static_cast<uint32_t>(data[offset + 1]) << 16 |
+          static_cast<uint32_t>(data[offset + 2]) << 8 |
+          static_cast<uint32_t>(data[offset + 3]);
+    return true;
+}
+
 static void on_response(const std::shared_ptr<vsomeip::message> &response) {
     vsomeip::method_t method = response->get_method();
-    auto data = response->get_payload()->get_uint32_data();
     const char *name = "method";
     uint32_t result = 0;
     if (method == METHOD_GET_VERSION) name = "GetVersion";
     else if (method == METHOD_ADD) name = "Add";
     else if (method == FIELD_SPEED) name = "ReadSpeed";
     else if (method == FIELD_SPEED + 1) name = "WriteSpeed";
-    if (!data.empty()) result = data[0];
+    read_u32(response->get_payload()->get_data(),
+             response->get_payload()->get_length(), 0, result);
     printf("  [resp 0x%04X] %-10s rc=0x%02X value=%u\n",
            method, name, response->get_return_code(), result);
 }
 
 static void on_event(const std::shared_ptr<vsomeip::message> &notification) {
     vsomeip::method_t event = notification->get_method();
-    auto data = notification->get_payload()->get_uint32_data();
-    if (event == EVENT_STATUS && data.size() >= 2) {
-        printf("  [event 0x%04X] status: ts=%u speed=%u km/h\n",
-               event, data[0], data[1]);
-    } else if (event == FIELD_SPEED + 2 && !data.empty()) {
-        printf("  [notify 0x%04X] speed field = %u km/h\n", event, data[0]);
+    const vsomeip::byte_t *data = notification->get_payload()->get_data();
+    size_t length = notification->get_payload()->get_length();
+    uint32_t a = 0, b = 0;
+    read_u32(data, length, 0, a);
+    read_u32(data, length, 4, b);
+    if (event == EVENT_STATUS) {
+        printf("  [event 0x%04X] status: ts=%u speed=%u km/h\n", event, a, b);
+    } else if (event == FIELD_SPEED + 2) {
+        printf("  [notify 0x%04X] speed field = %u km/h\n", event, a);
     } else {
-        printf("  [event 0x%04X] %zu u32s\n", event, data.size());
+        printf("  [event 0x%04X] %zu bytes\n", event, length);
+    }
+}
+
+static void on_any_message(const std::shared_ptr<vsomeip::message> &message) {
+    if (message->get_message_type() == vsomeip::message_type_e::MT_NOTIFICATION) {
+        on_event(message);
+    } else {
+        on_response(message);
     }
 }
 
@@ -87,12 +119,8 @@ int main() {
         fprintf(stderr, "vsomeip init failed\n");
         return 1;
     }
-    g_app->register_message_handler(SERVICE_ID, INSTANCE_ID, METHOD_GET_VERSION, on_response);
-    g_app->register_message_handler(SERVICE_ID, INSTANCE_ID, METHOD_ADD, on_response);
-    g_app->register_message_handler(SERVICE_ID, INSTANCE_ID, FIELD_SPEED, on_response);
-    g_app->register_message_handler(SERVICE_ID, INSTANCE_ID, FIELD_SPEED + 1, on_response);
-    g_app->register_event_handler(SERVICE_ID, INSTANCE_ID, EVENT_STATUS, on_event);
-    g_app->register_event_handler(SERVICE_ID, INSTANCE_ID, FIELD_SPEED + 2, on_event);
+    g_app->register_message_handler(vsomeip::ANY_SERVICE, INSTANCE_ID,
+                                    vsomeip::ANY_METHOD, on_any_message);
     g_app->register_availability_handler(SERVICE_ID, INSTANCE_ID, on_availability);
     g_app->request_service(SERVICE_ID, INSTANCE_ID);
 
