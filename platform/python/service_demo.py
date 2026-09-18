@@ -1,8 +1,8 @@
 import struct
 import time
 
-from someip import SomeIpService
-from someip.constants import ReturnCode
+from someip.legacy import SomeIpService
+from someip.legacy.constants import ReturnCode
 
 SERVICE_ID = 0x1234
 INSTANCE_ID = 0x5678

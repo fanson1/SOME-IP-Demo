@@ -1,5 +1,5 @@
-#ifndef SOMEIP_NET_HPP
-#define SOMEIP_NET_HPP
+#ifndef SOMEIP_LEGACY_NET_HPP
+#define SOMEIP_LEGACY_NET_HPP
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -9,7 +9,9 @@
 #include <cstring>
 #include <string>
 
-namespace net {
+#include "sd.hpp"  // someip::legacy::SD_PORT / SD_MULTICAST_ADDRESS
+
+namespace someip { namespace legacy {
 
 inline bool calc_ip(const struct sockaddr_in &addr, std::string &out) {
     char buf[INET_ADDRSTRLEN] = {0};
@@ -71,11 +73,11 @@ inline int local_ipv4(std::string &out) {
 }
 
 inline int make_sd_socket(const std::string &interface_ip) {
-    int fd = make_udp_socket(sd::SD_PORT, true);
+    int fd = make_udp_socket(someip::legacy::SD_PORT, true);
     if (fd < 0) return -1;
     ip_mreq mreq;
     std::memset(&mreq, 0, sizeof(mreq));
-    inet_pton(AF_INET, sd::SD_MULTICAST_ADDRESS, &mreq.imr_multiaddr);
+    inet_pton(AF_INET, someip::legacy::SD_MULTICAST_ADDRESS, &mreq.imr_multiaddr);
     inet_pton(AF_INET, interface_ip.c_str(), &mreq.imr_interface);
     setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
     struct in_addr ifaddr;
@@ -88,6 +90,7 @@ inline int make_sd_socket(const std::string &interface_ip) {
     return fd;
 }
 
-} // namespace net
+} // namespace legacy
+} // namespace someip
 
-#endif // SOMEIP_NET_HPP
+#endif // SOMEIP_LEGACY_NET_HPP

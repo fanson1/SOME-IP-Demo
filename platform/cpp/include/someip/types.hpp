@@ -1,10 +1,10 @@
-#ifndef SOMEIP2_TYPES_HPP
-#define SOMEIP2_TYPES_HPP
+#ifndef SOMEIP_TYPES_HPP
+#define SOMEIP_TYPES_HPP
 
 #include <stdexcept>
 #include <cstdint>
 
-namespace someip2 {
+namespace someip {
 
 constexpr uint8_t PROTOCOL_VERSION = 0x01;
 constexpr size_t MAX_PAYLOAD_NO_TP = 1392;
@@ -36,6 +36,6 @@ public:
     explicit MalformedMessage(const std::string &what) : WireError(what) {}
 };
 
-} // namespace someip2
+} // namespace someip
 
-#endif // SOMEIP2_TYPES_HPP
+#endif // SOMEIP_TYPES_HPP

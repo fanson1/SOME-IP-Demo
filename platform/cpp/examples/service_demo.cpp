@@ -10,13 +10,13 @@
 #include <functional>
 #include <memory>
 
-#include "someip.hpp"
-#include "sd.hpp"
-#include "net.hpp"
+#include "someip/legacy/someip.hpp"
+#include "someip/legacy/sd.hpp"
+#include "someip/legacy/net.hpp"
 
-using someip::Message;
-using someip::MessageType;
-using someip::ReturnCode;
+using someip::legacy::Message;
+using someip::legacy::MessageType;
+using someip::legacy::ReturnCode;
 
 typedef std::function<void(const std::vector<uint8_t> &, const sockaddr_in &, uint8_t &,
                            std::vector<uint8_t> &)> MethodHandler;
@@ -49,16 +49,16 @@ static void offer_once(int sd_fd, const std::string &interface_ip) {
     std::vector<std::vector<uint8_t>> entries;
     std::vector<std::vector<uint8_t>> options;
     std::vector<uint8_t> entry;
-    sd::build_entry(sd::EntryType::OFFER_SERVICE, SERVICE_ID, INSTANCE_ID,
-                    MAJOR_VERSION, sd::SD_TTL, MINOR_VERSION, 0, 0, 1, entry);
+    someip::legacy::build_entry(someip::legacy::EntryType::OFFER_SERVICE, SERVICE_ID, INSTANCE_ID,
+                    MAJOR_VERSION, someip::legacy::SD_TTL, MINOR_VERSION, 0, 0, 1, entry);
     entries.push_back(entry);
     std::vector<uint8_t> option;
-    sd::build_ipv4_endpoint_option(interface_ip, METHOD_PORT, option);
+    someip::legacy::build_ipv4_endpoint_option(interface_ip, METHOD_PORT, option);
     options.push_back(option);
     std::vector<uint8_t> data;
-    sd::build_sd_message(entries, options, next_session(), data);
-    sockaddr_in group = net::make_addr(sd::SD_MULTICAST_ADDRESS, sd::SD_PORT);
-    net::send_to(sd_fd, group, data.data(), data.size());
+    someip::legacy::build_sd_message(entries, options, next_session(), data);
+    sockaddr_in group = someip::legacy::make_addr(someip::legacy::SD_MULTICAST_ADDRESS, someip::legacy::SD_PORT);
+    someip::legacy::send_to(sd_fd, group, data.data(), data.size());
 }
 
 static void offer_thread(int sd_fd, const std::string &interface_ip) {
@@ -108,14 +108,14 @@ static void publish_event(Service &svc, uint16_t event_id,
     auto sit = svc.subscribers.find(eventgroup);
     if (sit == svc.subscribers.end()) return;
     for (const auto &target : sit->second) {
-        net::send_to(svc.event_fd, target, data.data(), data.size());
+        someip::legacy::send_to(svc.event_fd, target, data.data(), data.size());
     }
 }
 
 static void set_uint32_field(Service &svc, uint16_t field_id, uint32_t value) {
     svc.fields[field_id] = value;
     std::vector<uint8_t> payload;
-    someip::push_u32(payload, value);
+    someip::legacy::push_u32(payload, value);
     publish_event(svc, field_id + 2, payload);
 }
 
@@ -158,7 +158,7 @@ static void method_thread(Service &svc) {
             ack.payload = response;
             std::vector<uint8_t> data;
             ack.to_buf(data);
-            net::send_to(svc.method_fd, from, data.data(), data.size());
+            someip::legacy::send_to(svc.method_fd, from, data.data(), data.size());
         }
     }
 }
@@ -180,28 +180,28 @@ static void sd_thread(Service &svc) {
         // skip our own offers
         Message sdmsg;
         if (!Message::from_buf(buf, size_t(n), sdmsg)) continue;
-        if (sdmsg.service_id != sd::SD_SERVICE_ID) continue;
+        if (sdmsg.service_id != someip::legacy::SD_SERVICE_ID) continue;
 
         const uint8_t *p = sdmsg.payload.data();
         size_t plen = sdmsg.payload.size();
         if (plen < 4) continue;
-        uint32_t entries_len = someip::load_u32(p);
+        uint32_t entries_len = someip::legacy::load_u32(p);
         if (4 + entries_len + 4 > plen) continue;
         const uint8_t *entries = p + 4;
         size_t o = 4 + entries_len;
-        uint32_t options_len = someip::load_u32(p + o);
+        uint32_t options_len = someip::legacy::load_u32(p + o);
         const uint8_t *opts = p + o + 4;
 
         std::vector<std::pair<std::string, uint16_t>> endpoints;
         size_t oc = 0;
         while (oc + 4 <= options_len) {
-            uint16_t olen = someip::load_u16(opts + oc);
+            uint16_t olen = someip::legacy::load_u16(opts + oc);
             uint8_t otype = opts[oc + 2];
-            if (otype == sd::OptionType::IPV4_ENDPOINT && olen >= 9) {
+            if (otype == someip::legacy::OptionType::IPV4_ENDPOINT && olen >= 9) {
                 char ipbuf[INET_ADDRSTRLEN];
                 snprintf(ipbuf, sizeof(ipbuf), "%u.%u.%u.%u",
                          opts[oc + 4], opts[oc + 5], opts[oc + 6], opts[oc + 7]);
-                uint16_t port = someip::load_u16(opts + oc + 9);
+                uint16_t port = someip::legacy::load_u16(opts + oc + 9);
                 endpoints.push_back(std::make_pair(std::string(ipbuf), port));
             }
             oc += 2 + olen;
@@ -212,22 +212,22 @@ static void sd_thread(Service &svc) {
             uint8_t etype = e[0];
             uint8_t index_first = e[1];
             uint8_t counts = e[3];
-            uint16_t sid = someip::load_u16(e + 4);
-            uint16_t iid = someip::load_u16(e + 6);
+            uint16_t sid = someip::legacy::load_u16(e + 4);
+            uint16_t iid = someip::legacy::load_u16(e + 6);
             uint8_t major = e[8];
             if (sid != SERVICE_ID || iid != INSTANCE_ID || major != MAJOR_VERSION)
                 continue;
-            if (etype == sd::EntryType::FIND_SERVICE) {
+            if (etype == someip::legacy::EntryType::FIND_SERVICE) {
                 offer_once(svc.sd_fd, svc.interface_ip);
-            } else if (etype == sd::EntryType::SUBSCRIBE_EVENTGROUP) {
-                uint16_t eventgroup = someip::load_u16(e + 12);
+            } else if (etype == someip::legacy::EntryType::SUBSCRIBE_EVENTGROUP) {
+                uint16_t eventgroup = someip::legacy::load_u16(e + 12);
                 uint8_t no = counts & 0x0F;
                 sockaddr_in sub;
                 std::memset(&sub, 0, sizeof(sub));
                 bool have = false;
                 if (no > 0 && size_t(index_first) < endpoints.size()) {
                     const auto &ep = endpoints[index_first];
-                    sub = net::make_addr(ep.first, ep.second);
+                    sub = someip::legacy::make_addr(ep.first, ep.second);
                     have = true;
                 }
                 if (have) {
@@ -235,14 +235,14 @@ static void sd_thread(Service &svc) {
                     std::vector<std::vector<uint8_t>> ack_entries;
                     std::vector<std::vector<uint8_t>> ack_options;
                     std::vector<uint8_t> ack_entry;
-                    sd::build_entry(sd::EntryType::SUBSCRIBE_EVENTGROUP_ACK,
+                    someip::legacy::build_entry(someip::legacy::EntryType::SUBSCRIBE_EVENTGROUP_ACK,
                                     SERVICE_ID, INSTANCE_ID, MAJOR_VERSION,
-                                    sd::SD_TTL, 0, eventgroup, 0, 0, ack_entry);
+                                    someip::legacy::SD_TTL, 0, eventgroup, 0, 0, ack_entry);
                     ack_entries.push_back(ack_entry);
                     std::vector<uint8_t> ack;
-                    sd::build_sd_message(ack_entries, ack_options, next_session(), ack);
-                    sockaddr_in group = net::make_addr(sd::SD_MULTICAST_ADDRESS, sd::SD_PORT);
-                    net::send_to(svc.sd_fd, group, ack.data(), ack.size());
+                    someip::legacy::build_sd_message(ack_entries, ack_options, next_session(), ack);
+                    sockaddr_in group = someip::legacy::make_addr(someip::legacy::SD_MULTICAST_ADDRESS, someip::legacy::SD_PORT);
+                    someip::legacy::send_to(svc.sd_fd, group, ack.data(), ack.size());
                 }
             }
         }
@@ -252,12 +252,12 @@ static void sd_thread(Service &svc) {
 int main() {
     setvbuf(stdout, nullptr, _IONBF, 0);
     std::string interface_ip;
-    if (net::local_ipv4(interface_ip) != 0) interface_ip = "127.0.0.1";
+    if (someip::legacy::local_ipv4(interface_ip) != 0) interface_ip = "127.0.0.1";
 
     Service svc(interface_ip);
-    svc.method_fd = net::make_udp_socket(METHOD_PORT, false);
-    svc.event_fd = net::make_udp_socket(EVENT_PORT, false);
-    svc.sd_fd = net::make_sd_socket(interface_ip);
+    svc.method_fd = someip::legacy::make_udp_socket(METHOD_PORT, false);
+    svc.event_fd = someip::legacy::make_udp_socket(EVENT_PORT, false);
+    svc.sd_fd = someip::legacy::make_sd_socket(interface_ip);
     if (svc.method_fd < 0 || svc.event_fd < 0 || svc.sd_fd < 0) {
         fprintf(stderr, "socket setup failed\n");
         return 1;
@@ -266,8 +266,8 @@ int main() {
     svc.methods[METHOD_GET_VERSION] = [](const std::vector<uint8_t> &, const sockaddr_in &,
                                          uint8_t &rc, std::vector<uint8_t> &out) {
         rc = ReturnCode::E_OK;
-        someip::push_u32(out, SERVICE_ID);
-        someip::push_u32(out, INSTANCE_ID);
+        someip::legacy::push_u32(out, SERVICE_ID);
+        someip::legacy::push_u32(out, INSTANCE_ID);
         out.push_back(MAJOR_VERSION);
         out.push_back(0x00);
     };
@@ -278,10 +278,10 @@ int main() {
             rc = ReturnCode::E_MALFORMED_MESSAGE;
             return;
         }
-        uint32_t a = someip::load_u32(payload.data());
-        uint32_t b = someip::load_u32(payload.data() + 4);
+        uint32_t a = someip::legacy::load_u32(payload.data());
+        uint32_t b = someip::legacy::load_u32(payload.data() + 4);
         rc = ReturnCode::E_OK;
-        someip::push_u32(out, a + b);
+        someip::legacy::push_u32(out, a + b);
     };
 
     svc.fields[FIELD_SPEED] = 0;
@@ -290,7 +290,7 @@ int main() {
     svc.methods[speed_getter] = [&svc](const std::vector<uint8_t> &, const sockaddr_in &,
                                        uint8_t &rc, std::vector<uint8_t> &out) {
         rc = ReturnCode::E_OK;
-        someip::push_u32(out, svc.fields[FIELD_SPEED]);
+        someip::legacy::push_u32(out, svc.fields[FIELD_SPEED]);
     };
     svc.methods[speed_setter] = [&svc](const std::vector<uint8_t> &payload, const sockaddr_in &,
                                        uint8_t &rc, std::vector<uint8_t> &out) {
@@ -298,7 +298,7 @@ int main() {
             rc = ReturnCode::E_MALFORMED_MESSAGE;
             return;
         }
-        uint32_t value = someip::load_u32(payload.data());
+        uint32_t value = someip::legacy::load_u32(payload.data());
         set_uint32_field(svc, FIELD_SPEED, value);
         rc = ReturnCode::E_OK;
         out = payload;
@@ -315,7 +315,7 @@ int main() {
     printf("  instance_id   = 0x%04X\n", INSTANCE_ID);
     printf("  method        = udp %s:%u\n", interface_ip.c_str(), METHOD_PORT);
     printf("  event         = udp %s:%u\n", interface_ip.c_str(), EVENT_PORT);
-    printf("  sd            = %s:%u\n", sd::SD_MULTICAST_ADDRESS, sd::SD_PORT);
+    printf("  sd            = %s:%u\n", someip::legacy::SD_MULTICAST_ADDRESS, someip::legacy::SD_PORT);
     printf("  methods       = GetVersion(0x0001), Add(0x0002)\n");
     printf("  field         = Speed(0x1000, getter/setter/notifier)\n");
     printf("  event         = Status(0x8001)\n");
@@ -328,8 +328,8 @@ int main() {
         speed = (speed + 10) % 220;
         set_uint32_field(svc, FIELD_SPEED, speed);
         std::vector<uint8_t> payload;
-        someip::push_u32(payload, uint32_t(::time(nullptr)));
-        someip::push_u32(payload, speed);
+        someip::legacy::push_u32(payload, uint32_t(::time(nullptr)));
+        someip::legacy::push_u32(payload, speed);
         publish_event(svc, EVENT_STATUS, payload);
     }
 

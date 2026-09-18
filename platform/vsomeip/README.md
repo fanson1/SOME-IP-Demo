@@ -12,7 +12,7 @@
 ## 目录
 
 ```
-vsomeip/
+platform/vsomeip/
 ├── service.cpp      # 发布方：GetVersion/Add Method + Speed Field + Status Event
 ├── client.cpp       # 订阅方：SD 发现 -> RPC -> 订阅事件
 ├── vsomeip.json     # 单机配置（unicast 127.0.0.1 + SD multicast）
@@ -29,7 +29,7 @@ vsomeip/
 
 ### 2. Docker
 ```bash
-docker build -t someip-demo vsomeip   # 镜像内含源码编译的 vsomeip
+docker build -t someip-demo platform/vsomeip   # 镜像内含源码编译的 vsomeip
 docker run --rm someip-demo ./build/service &     # 终端1
 docker run --rm --network host -e VSOMEIP_CONFIGURATION=/app/vsomeip.json someip-demo ./build/client  # 终端2
 ```
@@ -41,7 +41,7 @@ sudo apt install -y build-essential cmake git \
 git clone --depth 1 --branch 3.7.6 https://github.com/COVESA/vsomeip /tmp/vsomeip
 cmake -S /tmp/vsomeip -B /tmp/vsomeip/build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
 cmake --build /tmp/vsomeip/build -j && sudo cmake --install /tmp/vsomeip/build
-cd vsomeip
+cd platform/vsomeip
 cmake -S . -B build && cmake --build build
 export VSOMEIP_CONFIGURATION=$PWD/vsomeip.json
 ./build/service &       # 终端1

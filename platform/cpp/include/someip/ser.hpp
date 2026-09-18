@@ -1,5 +1,5 @@
-#ifndef SOMEIP2_SER_HPP
-#define SOMEIP2_SER_HPP
+#ifndef SOMEIP_SER_HPP
+#define SOMEIP_SER_HPP
 
 #include "types.hpp"
 
@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace someip2 {
+namespace someip {
 
 // Writer emits big-endian AUTOSAR wire-format primitives.
 class Writer {
@@ -165,6 +165,6 @@ private:
     size_t start_ = 0;
 };
 
-} // namespace someip2
+} // namespace someip
 
-#endif // SOMEIP2_SER_HPP
+#endif // SOMEIP_SER_HPP

@@ -1,6 +1,7 @@
 """Wire layer: SOME/IP header encode/decode with strict validation.
 
-Byte layout is fully compatible with v1 (`someip_demo/someip/header.py`):
+Byte layout is fully compatible with the v1/legacy stack
+(``someip/legacy/header.py``):
     ">HHIHHBBBB"  (16 bytes header, payload after it).
 """
 

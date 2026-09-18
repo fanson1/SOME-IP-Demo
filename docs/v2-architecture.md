@@ -1,8 +1,9 @@
 # SOME/IP 自研栈 v2 —— 架构设计
 
-> 目标：把已验证的 v1（`python/someip/` Python + `cpp/v1/` C++11）
-> 升级为**面向量产方向的自研 SOME/IP 栈**，双实现字节级互操作，
-> 覆盖 vsomeip 生产特性的核心子集，并以互操作矩阵 + 性能基准持续回归。
+> 目标：把已验证的 legacy（v1，`platform/python/someip/legacy/` Python +
+> `platform/cpp/include/someip/legacy/` C++11）升级为**面向量产方向的自研
+> SOME/IP 主栈**，双实现字节级互操作，覆盖 vsomeip 生产特性的核心子集，
+> 并以互操作矩阵 + 性能基准持续回归。
 
 ## 1. 特性范围（与 vsomeip 能力映射）
 
@@ -43,23 +44,27 @@ DBus/管理接口。这些依赖环境或需整车集成，自研纯栈仅提供
 ### 目录约定
 
 ```
-python/someip2/               # Python v2（零第三方依赖）
-  types.py wire.py ser.py transport.py tpc.py sdm.py app.py config.py log.py xutil.py
-cpp/v2/                       # C++ v2（C++17，零第三方依赖，POSIX）
-  include/someip2/*.h  src/*.cpp  tests/  Makefile(tests)  CMakeLists.txt
-tests/  互操作与单测脚本（tests/run_interop_matrix.sh）
+platform/python/someip/        # Python 主栈（唯一包 someip，零第三方依赖）
+  __init__  types.py  wire.py  ser.py  transport.py  tpc.py  sdm.py  app.py  config.py  log.py  xutil.py
+platform/python/someip/legacy/ # v1 兼容层（驱动 demo，v2 完成后退役）
+platform/cpp/include/someip/   # C++ 主栈（唯一库 someip，C++17，零第三方依赖，POSIX）
+  types.hpp  wire.hpp  ser.hpp  transport.hpp  tpc.hpp  sdm.hpp  app.hpp
+platform/cpp/include/someip/legacy/  # v1 兼容层（C++11，namespace someip::legacy）
+platform/cpp/{tests,examples}  Makefile  CMakeLists.txt
+tests/   互操作与单测脚本（tests/run_interop_matrix.sh，python3 -m unittest discover -s tests -p 'test_py_*.py'）
 scripts/ 一键全面测试（scripts/run_all.sh）
-bench/  性能基准（bench/bench_rpc.py + bench_report）
+bench/   性能基准（bench/bench_rpc.py + bench_report，预留）
+platform/vsomeip/              # 量产对照栈（COVESA vsomeip，Linux/容器/云端 CI）
 ```
 
-统一布局（v1/v2 均归入同语言的 `python/` / `cpp/` 目录，`vsomeip/` 为量产对照，
-详见根 README「仓库布局」）。
+统一布局：按语言收敛到 `platform/`，语言内**单一主命名空间**（`someip`），
+版本演化用兼容层 + 语义化版本（`someip.__version__`），不以目录/包名分裂 v1/v2。
 
 ## 3. 兼容红线（字节级互操作保证）
 
-1. v2 与 v1 **线上字节完全兼容**：RequestId(client_id<<16|session)、length、SD entries/options 布局不变。
-2. v2↔v2、v2↔v1、Python↔C++ 全组合互操作矩阵必须全绿才能合入。
-3. 新增能力（TP/TCP/Nack）走**可选开关**：默认路径与 v1 报文一致。
+1. v2 与 legacy（v1）**线上字节完全兼容**：RequestId(client_id<<16|session)、length、SD entries/options 布局不变。
+2. v2↔v2、v2↔legacy、Python↔C++ 全组合互操作矩阵必须全绿才能合入。
+3. 新增能力（TP/TCP/Nack）走**可选开关**：默认路径与 legacy 报文一致。
 
 ## 4. 关键不变量与防御
 

@@ -1,7 +1,7 @@
 import struct
 import time
 
-from someip import SomeIpClient
+from someip.legacy import SomeIpClient
 
 SERVICE_ID = 0x1234
 INSTANCE_ID = 0x5678

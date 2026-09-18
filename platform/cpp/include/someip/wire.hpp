@@ -1,5 +1,5 @@
-#ifndef SOMEIP2_WIRE_HPP
-#define SOMEIP2_WIRE_HPP
+#ifndef SOMEIP_WIRE_HPP
+#define SOMEIP_WIRE_HPP
 
 #include "types.hpp"
 
@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace someip2 {
+namespace someip {
 
 // Header is the 16-byte fixed part of a SOME/IP message.
 struct Header {
@@ -90,6 +90,6 @@ struct Message {
     }
 };
 
-} // namespace someip2
+} // namespace someip
 
-#endif // SOMEIP2_WIRE_HPP
+#endif // SOMEIP_WIRE_HPP

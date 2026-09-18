@@ -4,8 +4,8 @@
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-PYDIR="$ROOT/python"
-CPPDIR="$ROOT/cpp/v1"
+PYDIR="$ROOT/platform/python"
+CPPDIR="$ROOT/platform/cpp"
 SLEEP_UP=2
 
 TMP=$(mktemp -d)

@@ -1,12 +1,12 @@
-#ifndef SOMEIP_SD_HPP
-#define SOMEIP_SD_HPP
+#ifndef SOMEIP_LEGACY_SD_HPP
+#define SOMEIP_LEGACY_SD_HPP
 
 #include <cstdint>
 #include <vector>
 #include <string>
 #include "someip.hpp"
 
-namespace sd {
+namespace someip { namespace legacy {
 
 const uint16_t SD_SERVICE_ID = 0xFFFF;
 const uint16_t SD_METHOD_ID = 0x8100;
@@ -37,7 +37,7 @@ inline void build_ipv4_endpoint_option(const std::string &address, uint16_t port
     out.push_back(uint8_t(a)); out.push_back(uint8_t(b));
     out.push_back(uint8_t(c)); out.push_back(uint8_t(d));
     out.push_back(L4_UDP);                      // L4 protocol
-    someip::push_u16(out, port);
+    someip::legacy::push_u16(out, port);
 }
 
 inline void build_entry(uint8_t type, uint16_t service_id, uint16_t instance_id,
@@ -49,18 +49,18 @@ inline void build_entry(uint8_t type, uint16_t service_id, uint16_t instance_id,
     out.push_back(index_first);
     out.push_back(0x00);                        // index second option run
     out.push_back(counts);
-    someip::push_u16(out, service_id);
-    someip::push_u16(out, instance_id);
+    someip::legacy::push_u16(out, service_id);
+    someip::legacy::push_u16(out, instance_id);
     out.push_back(major);
     out.push_back(uint8_t(ttl >> 16));
     out.push_back(uint8_t(ttl >> 8));
     out.push_back(uint8_t(ttl));
     if (type == EntryType::SUBSCRIBE_EVENTGROUP ||
         type == EntryType::SUBSCRIBE_EVENTGROUP_ACK) {
-        someip::push_u16(out, eventgroup_id);
-        someip::push_u16(out, 0x0000);
+        someip::legacy::push_u16(out, eventgroup_id);
+        someip::legacy::push_u16(out, 0x0000);
     } else {
-        someip::push_u32(out, minor);
+        someip::legacy::push_u32(out, minor);
     }
 }
 
@@ -73,25 +73,26 @@ inline void build_sd_message(const std::vector<std::vector<uint8_t>> &entries,
     for (const auto &o : options) options_raw.insert(options_raw.end(), o.begin(), o.end());
 
     std::vector<uint8_t> payload;
-    someip::push_u32(payload, uint32_t(entries_raw.size()));
+    someip::legacy::push_u32(payload, uint32_t(entries_raw.size()));
     payload.insert(payload.end(), entries_raw.begin(), entries_raw.end());
     while (payload.size() % 4 != 0) payload.push_back(0);
-    someip::push_u32(payload, uint32_t(options_raw.size()));
+    someip::legacy::push_u32(payload, uint32_t(options_raw.size()));
     payload.insert(payload.end(), options_raw.begin(), options_raw.end());
     while (payload.size() % 4 != 0) payload.push_back(0);
 
-    someip::Message msg;
+    someip::legacy::Message msg;
     msg.service_id = SD_SERVICE_ID;
     msg.method_id = SD_METHOD_ID;
     msg.client_id = 0x0000;
     msg.session_id = session_id;
-    msg.message_type = someip::MessageType::NOTIFICATION;
-    msg.return_code = someip::ReturnCode::E_OK;
+    msg.message_type = someip::legacy::MessageType::NOTIFICATION;
+    msg.return_code = someip::legacy::ReturnCode::E_OK;
     msg.interface_version = 0x01;
     msg.payload = std::move(payload);
     msg.to_buf(out);
 }
 
-} // namespace sd
+} // namespace legacy
+} // namespace someip
 
-#endif // SOMEIP_SD_HPP
+#endif // SOMEIP_LEGACY_SD_HPP

@@ -7,10 +7,10 @@ import unittest
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
-sys.path.insert(0, os.path.join(_ROOT, "python"))
+sys.path.insert(0, os.path.join(_ROOT, "platform", "python"))
 
-from someip2.ser import Writer, Reader
-from someip2.types import MalformedMessage
+from someip.ser import Writer, Reader
+from someip.types import MalformedMessage
 
 
 class TestWriterReader(unittest.TestCase):

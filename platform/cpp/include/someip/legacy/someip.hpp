@@ -1,11 +1,11 @@
-#ifndef SOMEIP_HPP
-#define SOMEIP_HPP
+#ifndef SOMEIP_LEGACY_HPP
+#define SOMEIP_LEGACY_HPP
 
 #include <cstdint>
 #include <vector>
 #include <string>
 
-namespace someip {
+namespace someip { namespace legacy {
 
 const uint8_t PROTOCOL_VERSION = 0x01;
 
@@ -95,6 +95,7 @@ inline void push_u32(std::vector<uint8_t> &v, uint32_t x) {
     v.push_back(uint8_t(x >> 8));  v.push_back(uint8_t(x));
 }
 
+} // namespace legacy
 } // namespace someip
 
-#endif // SOMEIP_HPP
+#endif // SOMEIP_LEGACY_HPP

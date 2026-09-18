@@ -6,9 +6,9 @@ import unittest
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
-sys.path.insert(0, os.path.join(_ROOT, "python"))
+sys.path.insert(0, os.path.join(_ROOT, "platform", "python"))
 
-from someip2.wire import Header, Message, MalformedMessage, PartialMessage
+from someip.wire import Header, Message, MalformedMessage, PartialMessage
 
 GOLDEN = bytes.fromhex(
     "12340002000000101111222201010000"
@@ -56,10 +56,11 @@ class TestWireV2(unittest.TestCase):
 
 
 class TestInteropWithV1(unittest.TestCase):
-    """Bytes produced by v1 must parse as v2 and vice versa."""
+    """Bytes produced by the legacy v1 stack must parse as the v2 stack and
+    vice versa."""
 
     def test_v1_bytes_parse_in_v2(self):
-        from someip.header import SomeIpMessage as V1
+        from someip.legacy.header import SomeIpMessage as V1
 
         v1 = V1(service_id=0x1234, method_id=0x0002, payload=b"\x00\x00\x00\x03"
                 b"\x00\x00\x00\x04", client_id=0x1111, session_id=0x2222,
@@ -72,7 +73,7 @@ class TestInteropWithV1(unittest.TestCase):
         self.assertEqual(v2.header.request_id, v1.request_id)
 
     def test_v2_bytes_parse_in_v1(self):
-        from someip.header import SomeIpMessage as V1
+        from someip.legacy.header import SomeIpMessage as V1
 
         h = Header(0x1234, 0x8001, client_id=0x0000, session_id=0x0001,
                    message_type=0x02)  # NOTIFICATION event
