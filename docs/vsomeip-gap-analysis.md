@@ -69,7 +69,7 @@ vsomeip 对拍评测），**不等于"可装进量产 ECU 的认证软件"**—�
 
 ### P0 功能主线（当前进行）
 - [x] wire / ser 双栈落地（Python + C++）
-- [ ] transport：UDP 端点抽象（unicast/multicast、select 超时、线程安全 send）
+- [x] transport：UDP 端点抽象（unicast/multicast、select/poll 超时、线程安全 send）+ TCP 流式分帧
 - [ ] tpc：SOME/IP-TP 分段/重组（会话 key=(service,method,client,session)、超时淘汰）
 - [ ] sdm：SD 状态机（Offer/Find/Subscribe Ack/Nack、TTL 周期刷新与过期、
       指数退避、initial delay、StopOffer）

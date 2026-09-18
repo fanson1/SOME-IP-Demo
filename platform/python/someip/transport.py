@@ -16,6 +16,7 @@ import select
 import socket
 import struct
 import threading
+import time
 
 from . import wire
 from .types import SD_MULTICAST_ADDRESS, SD_PORT, SomeIpError
@@ -245,17 +246,29 @@ class TcpConnection:
             view = view[n:]
 
     def recv_frame(self, timeout=_DEFAULT_TIMEOUT):
-        """Return the next complete SOME/IP message, or ``None`` on clean EOF."""
+        """Return the next complete SOME/IP message, or ``None`` on clean EOF.
+
+        Loops internally until a full frame arrives, so frames split across
+        many small TCP segments are still reconstructed within ``timeout``.
+        """
         if self._closed:
             raise TransportError("connection is closed")
-        r, _, _ = select.select([self._sock], [], [], timeout)
-        if not r:
-            raise ReceiveTimeout("no frame within %.3fs" % timeout)
-        chunk = self._sock.recv(65536)
-        if not chunk:
-            raise EOFError("peer closed the connection")
-        self._buf.feed(chunk)
-        return self._buf.try_frame()
+        deadline = time.monotonic() + timeout
+        while True:
+            if self._buf.pending() >= wire.HEADER_SIZE:
+                frame = self._buf.try_frame()
+                if frame is not None:
+                    return frame
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ReceiveTimeout("no frame within %.3fs" % timeout)
+            r, _, _ = select.select([self._sock], [], [], min(remaining, _DEFAULT_TIMEOUT))
+            if not r:
+                continue
+            chunk = self._sock.recv(65536)
+            if not chunk:
+                raise EOFError("peer closed the connection")
+            self._buf.feed(chunk)
 
     def fileno(self):
         return self._sock.fileno()
