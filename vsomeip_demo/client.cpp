@@ -114,6 +114,7 @@ static void on_availability(vsomeip::service_t service, vsomeip::instance_t inst
 }
 
 int main() {
+    setvbuf(stdout, nullptr, _IONBF, 0);
     g_app = vsomeip::runtime::get()->create_application("someip-client");
     if (!g_app->init()) {
         fprintf(stderr, "vsomeip init failed\n");

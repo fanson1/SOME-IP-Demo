@@ -58,8 +58,8 @@ jobs:
           export VSOMEIP_CONFIGURATION=$PWD/vsomeip.json
           ./build/service > /tmp/service.log 2>&1 &
           SVC=$!
-          sleep 6
-          timeout 15 ./build/client | tee /tmp/client.log
+          sleep 10
+          timeout 30 ./build/client | tee /tmp/client.log
           kill $SVC 2>/dev/null || true
           echo "===== service.log ====="
           cat /tmp/service.log
