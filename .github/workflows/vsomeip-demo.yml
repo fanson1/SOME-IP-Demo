@@ -65,6 +65,11 @@ jobs:
           ./build/service > /tmp/service.log 2>&1 &
           SVC=$!
           sleep 10
+          if ! kill -0 $SVC 2>/dev/null; then
+            echo "SERVICE DIED at startup:"
+            cat /tmp/service.log
+            exit 1
+          fi
           timeout 30 ./build/client | tee /tmp/client.log || true
           kill $SVC 2>/dev/null || true
           sleep 1
@@ -93,6 +98,28 @@ jobs:
               --title "vsomeip build debug (${{ github.run_id }}/${{ github.run_attempt }})" \
               --body-file /tmp/body.md
           fi
+
+      - name: Publish runtime failure log (debug)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f /tmp/demo_ok ]; then exit 0; fi
+          if [ ! -s /tmp/client.log ] && [ ! -s /tmp/service.log ]; then exit 0; fi
+          {
+            echo "## vsomeip runtime failed (run ${{ github.run_id }}/${{ github.run_attempt }})"
+            if [ -s /tmp/client.log ]; then
+              echo '=== client.log ==='; echo '```text'
+              head -c 30000 /tmp/client.log; echo '```'
+            fi
+            if [ -s /tmp/service.log ]; then
+              echo '=== service.log (tail) ==='; echo '```text'
+              tail -c 30000 /tmp/service.log; echo '```'
+            fi
+          } > /tmp/body.md
+          gh issue create --repo "${GITHUB_REPOSITORY}" \
+            --title "vsomeip runtime debug (${{ github.run_id }}/${{ github.run_attempt }})" \
+            --body-file /tmp/body.md
 
       - name: Assert results
         run: |

@@ -13,8 +13,8 @@
         }
     ],
     "applications": [
-        { "name": "someip-service", "port": "30500" },
-        { "name": "someip-client",  "port": "30501" }
+        { "name": "someip-service", "port": "30510" },
+        { "name": "someip-client",  "port": "30511" }
     ],
     "logging": {
         "level": "debug",
