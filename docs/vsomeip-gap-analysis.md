@@ -37,7 +37,7 @@ SIGINT/SIGTERM 优雅停止、多宿主/IPv6、发送缓冲与部分发送。
 | JSON 配置系统 | ✅（cfg） | ✅ config（Python + C++ 双实现，vsomeip 子集） | P1 |
 | 分级日志 + DLT | ✅ | ✅ log（Python + C++，debug/info/warn/error，env/config） | P1 |
 | 优雅关闭 + watchdog + 背压 | ✅ | ✅ carrier/watchdog（看门狗双实现，service 发布循环 + client 事件停流检测并 resubscribe）+ 关闭时 join 线程 + request 在途上限 1024 | P1 |
-| 性能基准 | ✅（CH 线程/nPDU/缓冲池） | ❌ bench 空 | P2 |
+| 性能基准 | ✅（CH 线程/nPDU/缓冲池） | ✅ bench_rpc（RTT/吞吐/丢包退避/背压）+ bench_report 基线，vsomeip 同场景预留 | P2 |
 | E2E 保护 | ✅（e2e） | ❌（未规划细节） | P3 backlog |
 
 ## 3. 架构对照
@@ -95,8 +95,11 @@ vsomeip 对拍评测），**不等于"可装进量产 ECU 的认证软件"**—�
   C++ `AppError`）；TPC re-assembler 已有 max_sessions 上限。
 
 ### P2 性能可测
-- [ ] bench_rpc：延迟/吞吐/丢包/退避对拍（vsomeip 预留同场景）
-- [ ] bench_report 基线入库
+- [x] bench_rpc：延迟/吞吐/丢包/退避对拍（vsomeip 预留同场景）
+  `benchmarks/bench_rpc.py`：RTT p50/p90、并发吞吐、void handler 注入丢包 + 超时
+  退避、背压上限命中；阈值判定可挂 CI。
+- [x] bench_report 基线入库
+  `docs/bench_report.md`：基线与历史表；vsomeip 同场景对拍列为 P2 预留对比项。
 
 ### P3 backlog（需专项立项，含流程投入）
 - [ ] E2E 保护 profile（CRC/计数器）

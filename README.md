@@ -14,21 +14,22 @@
 SOME-IP-Demo/
 ├── platform/
 │   ├── python/            # 唯一包 `someip`：
-│   │   │                 #   主栈 v2 = types/wire/ser.py
-│   │   │                 #   兼容层 = someip/legacy/（v1，驱动两个 demo）
+│   │   │                 #   主栈 v2 = app/sdm/tpc/transport/wire/ser/types
+│   │   │                 #   横切 = config(JSON)/log(分级)/watchdog
 │   │   ├── pyproject.toml #   可 pip install -e .
 │   │   └── service_demo.py / client_demo.py
-│   ├── cpp/               # 唯一库 `someip`：
-│   │   │                 #   主栈 v2 = include/someip/{types,wire,ser}.hpp
-│   │   │                 #   兼容层 legacy = include/someip/legacy/（v1 demo 示例）
-│   │   ├── Makefile / CMakeLists.txt
-│   │   ├── tests/test_wire_ser.cpp
+│   ├── cpp/               # 唯一库 `someip`（C++17 头文件）：
+│   │   │                 #   主栈 v2 = include/someip/{app,sdm,tpc,transport,wire,ser}.hpp
+│   │   │                 #   横切 = include/someip/{config,log,watchdog}.hpp
+│   │   ├── Makefile
+│   │   ├── tests/         # test_{wire_ser,transport,tpc,sdm,config,log,watchdog,app}.cpp
 │   │   └── examples/service_demo.cpp / client_demo.cpp
 │   └── vsomeip/           # 量产对照（COVESA vsomeip，Linux/容器/云端 CI）
-├── tests/                 # 协议层单测 + v1 互操作矩阵脚本
+├── tests/                 # 协议层单测 + v2/v1 互操作矩阵脚本
+├── benchmarks/bench_rpc.py# RRC 对拍基准（延迟/吞吐/丢包退避/背压）
+├── config/someip_demo.json# JSON 配置样例（-c/--config）
 ├── scripts/run_all.sh     # 一键全面测试
-├── bench/                 # 性能基准（预留）
-├── docs/v2-architecture.md
+├── docs/                  # 架构说明 / 差距矩阵 / 基准报告
 └── .github/workflows/     # vsomeip 云端构建+断言（issue 自动诊断）
 ```
 
@@ -38,13 +39,11 @@ SOME-IP-Demo/
 
 | 目录 | 代 | 语言 | 命名空间 | 状态 |
 | --- | --- | --- | --- | --- |
-| `platform/python/someip` | v2 主栈 | Python（零依赖） | `someip.wire/.ser/.types` | 进行中（wire/ser，单测通过） |
-| `platform/python/someip/legacy` | v1 兼容层 | Python（零依赖） | `someip.legacy.*` | 完成，驱动 demo，与 C++ legacy 互操作已验证 |
-| `platform/cpp/include/someip` | v2 主栈 | C++17（零依赖） | namespace `someip` | 进行中（wire/ser，单测通过） |
-| `platform/cpp/include/someip/legacy` | v1 兼容层 | C++11（零依赖） | namespace `someip::legacy` | 完成，与 Python legacy 互操作已验证 |
+| `platform/python/someip` | v2 主栈 | Python（零依赖） | `someip.*` | 完成：app/sdm/tpc/transport/wire/ser/types + config/log/watchdog，全量单测+互操作矩阵绿 |
+| `platform/cpp/include/someip` | v2 主栈 | C++17（零依赖） | namespace `someip` | 完成：与 Python v2 同构，单测+矩阵绿 |
 | `platform/vsomeip` | 量产对照 | C++17 + vsomeip | — | 工程/CI 齐全，运行验证挂起（见状态） |
 
-兼容红线：`v2 与 legacy 线上字节完全兼容`，新增能力（TP/TCP/Nack）走可选开关。详见 `docs/v2-architecture.md`。
+兼容红线：`v2 与 v1/legacy 线上字节完全兼容`，新增能力（TP/TCP/Nack）走可选开关。详见 `docs/v2-architecture.md`。
 
 ## 快速启动（legacy demo）
 
@@ -64,12 +63,20 @@ Python/C++ 可在同一网络中互相跨栈调用（见测试矩阵）。
 ## 主栈（v2）使用
 
 ```python
-from someip import Header, Message, Writer, Reader   # pip install -e platform/python
+from someip.app import SomeipServiceV2, ClientV2   # pip install -e platform/python
+from someip import config, log                     # JSON 配置 + 分级日志
 ```
 
 ```cpp
-#include <someip/wire.hpp>   // -I platform/cpp/include, link Threads
+#include <someip/app.hpp>     // -I platform/cpp/include, link Threads
+#include <someip/config.hpp>  // AppConfig + 零依赖 JSON 解析
+#include <someip/log.hpp>
+#include <someip/watchdog.hpp>
 ```
+
+JSON 配置：`config/someip_demo.json`，demo 用 `-c/--config` 指定；日志级别由
+`SOMEIP_LOG_LEVEL` 或 config `log.level` 控制；服务/客户端 `stop()` 均 join 工作
+线程，发布循环与事件推送带 watchdog 与在途请求背压上限。
 
 ## 全面测试
 
@@ -83,10 +90,10 @@ from someip import Header, Message, Writer, Reader   # pip install -e platform/p
 
 | 步骤 | 内容 | 判定 |
 | --- | --- | --- |
-| Python v2 协议单测 | `python3 -m unittest discover -s tests -p "test_py_*.py"` | 16 用例全绿（含 v2↔legacy golden bytes） |
-| C++ v2 编译+单测 | `make -C platform/cpp test` | ALL PASSED |
-| C++ legacy 构建 | `make -C platform/cpp all` | 编译通过 |
+| Python v2 协议单测 | `python3 -m unittest discover -s tests -p "test_py_*.py"` | 83 用例全绿（含 config/log/watchdog/背压） |
+| C++ v2 编译+单测 | `make -C platform/cpp test` | 8 个测试组 ALL PASSED |
 | 互操作矩阵 | `tests/run_interop_matrix.sh` | 4 组合全绿（两端各自断言） |
+| RPC 基准 | `python3 -u benchmarks/bench_rpc.py` | PASS（见 `docs/bench_report.md`） |
 
 ### 互操作矩阵（4 组合）
 
@@ -101,9 +108,13 @@ from someip import Header, Message, Writer, Reader   # pip install -e platform/p
 
 ## 当前状态
 
-- ✅ legacy（v1）Python/C++ 全组合互操作已验证，回归脚本一键可跑
-- ✅ v2 wire/ser 双栈落地 + 单测通过（下一步：SD 完整状态机）
-- ⏸ vsomeip 云端 CI 能完成源码编译与 demo 编译，运行阶段 availability 未触发（client.log 为空）；已自动化 issue 诊断，待 v2 推进后再处理
+- ✅ v2 主栈 Python + C++ 全模块落地（app/sdm/tpc/transport/wire/ser + config/log/watchdog/背压），
+  全套单测 + 4 组合互操作矩阵 + RPC 基准全绿（`docs/bench_report.md` 基线）
+- ✅ 优雅关闭（stop 并 join 线程）、发布/事件 watchdog、在途请求背压上限 1024
+- ✅ 差距矩阵 `docs/vsomeip-gap-analysis.md`：P1 全部达成，P2 bench 入库，P3 为专项 backlog
+- ⏸ vsomeip 云端 CI 能完成源码编译与 demo 编译，运行阶段 availability 未触发（client.log 为空）；
+  bench 同场景对拍预留（见 `docs/bench_report.md`）
+- 已知差异：macOS 环境仅 UDP（无 TCP endpoint 集成测试）；多进程 daemon 模式在边界外
 
 ## 协议要点
 

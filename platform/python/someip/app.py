@@ -232,9 +232,12 @@ class SomeipServiceV2:
             rc, response = ReturnCode.E_UNKNOWN_METHOD, b""
         else:
             try:
-                rc, response = handler(msg.payload, addr)
+                result = handler(msg.payload, addr)
             except Exception:
-                rc, response = ReturnCode.E_NOT_OK, b""
+                result = (ReturnCode.E_NOT_OK, b"")
+            if result is None:
+                return  # void handler: intentionally no response (one-way)
+            rc, response = result
         if header.message_type == MessageType.REQUEST:
             resp = Message(
                 Header(self.service_id, header.method_id, header.client_id,

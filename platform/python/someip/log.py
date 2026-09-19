@@ -37,17 +37,17 @@ class Logger:
         self.component = component
         self.level = _default_level if level is None else _level(level)
 
-    def debug(self, msg):
-        self._emit(LEVELS["debug"], msg)
+    def debug(self, msg, *args):
+        self._emit(LEVELS["debug"], msg % args if args else msg)
 
-    def info(self, msg):
-        self._emit(LEVELS["info"], msg)
+    def info(self, msg, *args):
+        self._emit(LEVELS["info"], msg % args if args else msg)
 
-    def warn(self, msg):
-        self._emit(LEVELS["warn"], msg)
+    def warn(self, msg, *args):
+        self._emit(LEVELS["warn"], msg % args if args else msg)
 
-    def error(self, msg):
-        self._emit(LEVELS["error"], msg)
+    def error(self, msg, *args):
+        self._emit(LEVELS["error"], msg % args if args else msg)
 
     def _emit(self, level, msg):
         if level < self.level:

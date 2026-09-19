@@ -19,6 +19,7 @@ INSTANCE_ID = 0x0246
 METHOD_WHO = 0x0001
 METHOD_ADD = 0x0002
 METHOD_ECHO = 0x0003
+METHOD_VOID = 0x0004
 FIELD_LEVEL = 0x2000
 EVENT_STATUS = 0x9002
 EVENTGROUP_MAIN = 0x0001
@@ -46,6 +47,7 @@ class TestServiceClient(unittest.TestCase):
         cls.service.add_method(METHOD_ADD,
                                lambda p, a: (0x00, struct.pack(">I", sum(struct.unpack(">II", p)))))
         cls.service.add_method(METHOD_ECHO, lambda p, a: (0x00, p))
+        cls.service.add_method(METHOD_VOID, lambda p, a: None)  # no response
         cls.service.add_uint32_field(FIELD_LEVEL, EVENTGROUP_MAIN, initial=42)
         cls.service.add_event(EVENT_STATUS, EVENTGROUP_MAIN)
         cls.service.start()
@@ -76,6 +78,12 @@ class TestServiceClient(unittest.TestCase):
         self._wait_service()
         rc, _ = self.client.request(SERVICE_ID, INSTANCE_ID, 0x00FF)
         self.assertEqual(rc, 0x03)  # E_UNKNOWN_METHOD
+
+    def test_void_handler_times_out(self):
+        self._wait_service()
+        with self.assertRaises(TimeoutError):
+            self.client.request(SERVICE_ID, INSTANCE_ID, METHOD_VOID,
+                                timeout=0.3)
 
     def test_event_notification(self):
         self._wait_service()
