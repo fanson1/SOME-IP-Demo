@@ -41,11 +41,11 @@ SOME-IP-Demo/
 | --- | --- | --- | --- | --- |
 | `platform/python/someip` | v2 主栈 | Python（零依赖） | `someip.*` | 完成：app/sdm/tpc/transport/wire/ser/types + config/log/watchdog，全量单测+互操作矩阵绿 |
 | `platform/cpp/include/someip` | v2 主栈 | C++17（零依赖） | namespace `someip` | 完成：与 Python v2 同构，单测+矩阵绿 |
-| `platform/vsomeip` | 量产对照 | C++17 + vsomeip | — | 工程/CI 齐全，运行验证挂起（见状态） |
+| `platform/vsomeip` | 量产对照 | C++17 + vsomeip | — | 工程/CI 齐全，云端 CI 全绿（见状态） |
 
 兼容红线：`v2 与 v1/legacy 线上字节完全兼容`，新增能力（TP/TCP/Nack）走可选开关。详见 `docs/v2-architecture.md`。
 
-## 快速启动（legacy demo）
+## 快速启动（v2 demo）
 
 ```bash
 # Python：两个终端
@@ -119,7 +119,8 @@ JSON 配置：`config/someip_demo.json`，demo 用 `-c/--config` 指定；日志
   Actions 全程断言 availability/GetVersion/Add/Speed/事件 + bench `BENCH PASS`
 - ✅ vsomeip 同场景基准对拍完成（`platform/vsomeip/bench.cpp`，RTT p50 1.08ms / p90 1.09ms，
   对比表见 `docs/bench_report.md`）
-- 已知差异：macOS 环境仅 UDP（无 TCP endpoint 集成测试）；多进程 daemon 模式在边界外
+- 已知差异：本机 macOS 上 UDP/TCP 均单测覆盖（loopback），互操作矩阵与 demo 网络路径走 UDP；
+  多进程 daemon 模式在边界外
 
 ## 协议要点
 
