@@ -50,6 +50,7 @@ static void event_thread(int event_fd) {
         Message msg;
         if (!Message::from_buf(buf, size_t(n), msg)) continue;
         if (msg.message_type != MessageType::NOTIFICATION) continue;
+        if (msg.message_type != MessageType::NOTIFICATION) continue;
         if (msg.method_id == EVENT_STATUS && msg.payload.size() >= 8) {
             uint32_t ts = someip::legacy::load_u32(msg.payload.data());
             uint32_t speed = someip::legacy::load_u32(msg.payload.data() + 4);
@@ -124,6 +125,13 @@ int main() {
     socklen_t event_len = sizeof(event_addr);
     getsockname(event_fd, (sockaddr *)&event_addr, &event_len);
     uint16_t event_port = ntohs(event_addr.sin_port);
+
+    // Event socket must never block join(): give it a receive timeout so the
+    // event thread wakes to observe g_running when the publisher goes quiet.
+    timeval ev_tv;
+    ev_tv.tv_sec = 0;
+    ev_tv.tv_usec = 200000;
+    setsockopt(event_fd, SOL_SOCKET, SO_RCVTIMEO, &ev_tv, sizeof(ev_tv));
 
     std::thread t_events(event_thread, event_fd);
 

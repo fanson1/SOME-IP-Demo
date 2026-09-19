@@ -226,6 +226,8 @@ class ServiceMonitor:
         self._phase = {}  # (svc,inst) -> "find"/"cycle"
         self._next_find = {}  # (svc,inst) -> monotonic deadline
         self._find_step = {}
+        self._acks = set()   # (svc,inst,eventgroup) acknowledged
+        self._nacks = set()  # (svc,inst,eventgroup) rejected
         self.on_available = None
         self.on_unavailable = None
         self.on_subscribe_ok = None
@@ -243,6 +245,30 @@ class ServiceMonitor:
     def subscribed_eventgroups(self, service_id, instance_id):
         return set(self._wanted.get((service_id, instance_id), {}).get(
             "eventgroups", ()))
+
+    def offer(self, service_id, instance_id):
+        """Return the current :class:`OfferRecord` (or ``None`` if unknown)."""
+        return self._offers.get((service_id, instance_id))
+
+    def subscription_state(self, service_id, instance_id, eventgroup_id):
+        """'ack' / 'nack' / 'none' tracking for a subscribed event group."""
+        key = (service_id, instance_id, eventgroup_id)
+        if key in self._acks:
+            return "ack"
+        if key in self._nacks:
+            return "nack"
+        return "none"
+
+    def resubscribe(self, service_id, instance_id):
+        """(Re)emit SUBSCRIBE if the service is already known and available."""
+        key = (service_id, instance_id)
+        rec = self._offers.get(key)
+        if rec is None or not rec.available:
+            return
+        if key not in self._wanted or not self._wanted[key]["eventgroups"]:
+            return
+        if key not in self._subscribed:
+            self._init_subscribe(key)
 
     # -- core --------------------------------------------------------------
     def process(self, now=None):
@@ -314,11 +340,15 @@ class ServiceMonitor:
             if e["type"] == SdEntryType.OFFER_SERVICE:
                 self._on_offer(key, e)
             elif e["type"] == SdEntryType.SUBSCRIBE_EVENTGROUP_ACK:
+                self._acks.add(key + (e["eventgroup_id"],))
+                self._nacks.discard(key + (e["eventgroup_id"],))
                 if key in self._subscribed:
                     self._subscribed[key]["renew_at"] = self._now() + SD_DEFAULT_TTL
                 if self.on_subscribe_ok:
                     self.on_subscribe_ok(key, e["eventgroup_id"])
             elif e["type"] == SdEntryType.SUBSCRIBE_EVENTGROUP_NACK:
+                self._nacks.add(key + (e["eventgroup_id"],))
+                self._acks.discard(key + (e["eventgroup_id"],))
                 self._subscribed.pop(key, None)
                 if self.on_subscribe_nack:
                     self.on_subscribe_nack(key, e["eventgroup_id"])
@@ -343,10 +373,11 @@ class ServiceMonitor:
                           e["minor_version"], address, port, deadline)
         was_available = key in self._offers and self._offers[key].available
         self._offers[key] = rec
-        if not was_available:
-            # newly available -> start subscription if any event group requested
+        if key not in self._subscribed:
+            # start (or restart) the subscription when event groups are wanted
             if self.subscribed_eventgroups(key[0], key[1]):
                 self._init_subscribe(key)
+        if not was_available:
             if self.on_available:
                 self.on_available(key)
 
@@ -493,9 +524,18 @@ class ServicePublisher:
                 self._send_queue.append(self._offer_message(offered))
             elif e["type"] == SdEntryType.SUBSCRIBE_EVENTGROUP:
                 if e["eventgroup_id"] in offered.eventgroups:
-                    self._subscribers.setdefault(key, set()).add(src_addr)
+                    target = None
+                    for opt in e["options"]:
+                        if opt["type"] == SdOptionType.IPV4_ENDPOINT:
+                            ep = ipv4_endpoint(opt)
+                            if ep:
+                                target = ep
+                                break
+                    if target is None:
+                        target = src_addr  # fall back to datagram source
+                    self._subscribers.setdefault(key, set()).add(target)
                     self._send_queue.append(self._subscribe_ack(offered, e,
-                                                                src_addr))
+                                                                target))
                 else:
                     self._send_queue.append(self._subscribe_nack(offered, e,
                                                                  src_addr))

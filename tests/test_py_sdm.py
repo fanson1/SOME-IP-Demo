@@ -147,7 +147,7 @@ class TestPublisher(unittest.TestCase):
         self.assertEqual(entries[0]["type"],
                          SdEntryType.SUBSCRIBE_EVENTGROUP_ACK)
         self.assertEqual(entries[0]["eventgroup_id"], 0x0001)
-        self.assertIn(("10.0.0.2", 30490), pub.subscribers(0x1234, 0x5678))
+        self.assertIn(("10.0.0.2", 30501), pub.subscribers(0x1234, 0x5678))
 
     def test_subscribe_nack_unknown_group(self):
         clock = FakeClock()
@@ -282,7 +282,7 @@ class TestMonitor(unittest.TestCase):
         for a in pub.process():
             mon.handle_datagram(a.to_bytes(), ("10.0.0.5", 30490))
         self.assertEqual(acked, [((0x1234, 0x5678), 0x0001)])
-        self.assertIn(("10.0.0.2", 30490), pub.subscribers(0x1234, 0x5678))
+        self.assertIn(("10.0.0.2", 30501), pub.subscribers(0x1234, 0x5678))
 
 
 if __name__ == "__main__":

@@ -1,8 +1,7 @@
 import struct
 import time
 
-from someip.legacy import SomeIpService
-from someip.legacy.constants import ReturnCode
+from someip.app import SomeipServiceV2
 
 SERVICE_ID = 0x1234
 INSTANCE_ID = 0x5678
@@ -15,7 +14,7 @@ EVENTGROUP_MAIN = 0x0001
 
 
 def main():
-    service = SomeIpService(
+    service = SomeipServiceV2(
         service_id=SERVICE_ID,
         instance_id=INSTANCE_ID,
         major_version=0x01,
@@ -25,14 +24,13 @@ def main():
     )
 
     def get_version(_payload, _addr):
-        return ReturnCode.E_OK, struct.pack(">IIBB", SERVICE_ID,
-                                            INSTANCE_ID, 1, 0)
+        return 0x00, struct.pack(">IIBB", SERVICE_ID, INSTANCE_ID, 1, 0)
 
     def add(payload, _addr):
         if len(payload) != 8:
-            return ReturnCode.E_MALFORMED_MESSAGE, b""
+            return 0x09, b""
         a, b = struct.unpack(">II", payload)
-        return ReturnCode.E_OK, struct.pack(">I", a + b)
+        return 0x00, struct.pack(">I", a + b)
 
     service.add_method(METHOD_GET_VERSION, get_version)
     service.add_method(METHOD_ADD, add)
@@ -40,7 +38,7 @@ def main():
     service.add_event(EVENT_STATUS, EVENTGROUP_MAIN)
 
     service.start()
-    print("SOME/IP Service started:")
+    print("SOME/IP Service (v2) started:")
     print("  service_id    = 0x%04X" % SERVICE_ID)
     print("  instance_id   = 0x%04X" % INSTANCE_ID)
     print("  method        = udp %s:%d" % (service.interface_ip,
