@@ -87,12 +87,7 @@ static void run_bench() {
             std::lock_guard<std::mutex> lk(g_pending_mx);
             g_pending[request->get_request()] = p;
         }
-        if (!g_app->send(request)) {
-            std::lock_guard<std::mutex> lk(g_pending_mx);
-            g_pending.erase(request->get_request());
-            ++completed;
-            continue;
-        }
+        g_app->send(request);
         std::unique_lock<std::mutex> lk(p->m);
         if (p->cv.wait_for(lk, std::chrono::seconds(2), [&] { return p->done; })) {
             ++completed;
