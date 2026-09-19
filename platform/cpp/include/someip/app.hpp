@@ -57,6 +57,9 @@ struct TimeoutError : AppError {
     explicit TimeoutError(const std::string &what) : AppError(what) {}
 };
 
+// Hard cap on in-flight requests per client (backpressure guard).
+constexpr size_t MAX_IN_FLIGHT_REQUESTS = 1024;
+
 // ------------------------------------------------------------------ utils --
 
 inline std::string local_ip() {
@@ -551,6 +554,9 @@ public:
             }
             dst = UdpEndpoint::ipv4(o->address.c_str(), o->port);
             session = next_client_session();
+            if (pending_.size() >= MAX_IN_FLIGHT_REQUESTS) {
+                throw AppError("in-flight request limit reached (backpressure)");
+            }
             pending_[session] = Pending{service_id, now_plus(timeout), false, false,
                                 std::nullopt};
         }
@@ -639,6 +645,13 @@ public:
             }
         }
         return false;
+    }
+
+    // Re-emit SUBSCRIBE for an already-discovered service (recovery).
+    void resubscribe(uint16_t service_id, uint16_t instance_id) {
+        std::lock_guard<std::mutex> lk(mx_);
+        monitor_.resubscribe(service_id, instance_id);
+        cv_.notify_all();
     }
 
 private:

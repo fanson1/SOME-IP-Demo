@@ -4,6 +4,7 @@ import time
 
 from someip import config, log
 from someip.app import ClientV2
+from someip.watchdog import Watchdog
 
 SERVICE_ID = 0x1234
 INSTANCE_ID = 0x5678
@@ -25,16 +26,26 @@ def main():
     logger = log.Logger("client_demo")
     kw = config.client_kwargs(cfg) if cfg else {}
     client = ClientV2(**kw).start()
-    client.on_event(EVENT_STATUS,
-                    lambda event_id, payload: print(
-                        "  [event 0x%04X] status: ts=%d speed=%d km/h"
-                        % (event_id,
-                           struct.unpack(">II", payload)[0],
-                           struct.unpack(">II", payload)[1])))
-    client.on_event(FIELD_SPEED + 2,
-                    lambda event_id, payload: print(
-                        "  [notify 0x%04X] speed field = %d km/h"
-                        % (event_id, struct.unpack(">I", payload)[0])))
+    wd = []
+
+    def on_status(event_id, payload):
+        if wd:
+            wd[0].pet()
+        print(
+            "  [event 0x%04X] status: ts=%d speed=%d km/h"
+            % (event_id,
+               struct.unpack(">II", payload)[0],
+               struct.unpack(">II", payload)[1]))
+
+    def on_notify(event_id, payload):
+        if wd:
+            wd[0].pet()
+        print(
+            "  [notify 0x%04X] speed field = %d km/h"
+            % (event_id, struct.unpack(">I", payload)[0]))
+
+    client.on_event(EVENT_STATUS, on_status)
+    client.on_event(FIELD_SPEED + 2, on_notify)
 
     print("Searching service 0x%04X/0x%04X ..." % (SERVICE_ID, INSTANCE_ID))
     if not client.wait_for_service(SERVICE_ID, INSTANCE_ID,
@@ -71,6 +82,12 @@ def main():
     else:
         print("Subscribe eventgroup failed")
 
+    def on_stall():
+        logger.warn("event stream stalled; resubscribing")
+        client.resubscribe(SERVICE_ID, INSTANCE_ID)
+
+    wd.append(Watchdog(3.0, on_expired=on_stall, interval=0.2).start())
+
     rc, payload = client.request(SERVICE_ID, INSTANCE_ID, FIELD_SPEED + 1,
                                  struct.pack(">I", 88))
     print("Write Speed(88) -> rc=0x%02X" % rc)
@@ -83,6 +100,8 @@ def main():
         time.sleep(6)
     except KeyboardInterrupt:
         pass
+    for w in wd:
+        w.stop()
     client.stop()
     print("Done.")
 

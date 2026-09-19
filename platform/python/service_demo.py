@@ -4,6 +4,7 @@ import time
 
 from someip import config, log
 from someip.app import SomeipServiceV2
+from someip.watchdog import Watchdog
 
 SERVICE_ID = 0x1234
 INSTANCE_ID = 0x5678
@@ -64,15 +65,20 @@ def main():
                 service.method_port, service.event_port, service.sd_port)
 
     speed = 0
+    watchdog = Watchdog(
+        5.0, on_expired=lambda: logger.error("publish loop stalled"),
+        interval=0.2).start()
     try:
         while True:
             time.sleep(1)
+            watchdog.pet()
             speed = (speed + 10) % 220
             service.set_field(FIELD_SPEED, speed)
             payload = struct.pack(">II", int(time.time()), speed)
             service.publish_event(EVENT_STATUS, payload)
     except KeyboardInterrupt:
         print("\nStopping service...")
+        watchdog.stop()
         logger.info("stopping service")
         service.stop()
 

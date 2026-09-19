@@ -33,6 +33,8 @@ from .wire import Header, Message
 
 REQUEST_TYPES = (MessageType.REQUEST, MessageType.REQUEST_NO_RETURN)
 
+MAX_IN_FLIGHT_REQUESTS = 1024
+
 
 def local_ip():
     """Best-effort default-route IPv4, falling back to loopback."""
@@ -176,6 +178,10 @@ class SomeipServiceV2:
                     ep.close()
                 except Exception:
                     pass
+        for t in self._threads:
+            if t is not None:
+                t.join(timeout=1.0)
+        self._threads = []
 
     # -- notifications -----------------------------------------------------
     def publish_event(self, event_id, payload):
@@ -359,6 +365,9 @@ class ClientV2:
                     ep.close()
                 except Exception:
                     pass
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+            self._thread = None
 
     # -- high-level ops ----------------------------------------------------
     def wait_for_service(self, service_id, instance_id, eventgroups=(),
@@ -394,6 +403,9 @@ class ClientV2:
         session = self._next_session()
         done = threading.Event()
         with self._lock:
+            if len(self._pending) >= MAX_IN_FLIGHT_REQUESTS:
+                raise SomeIpError(
+                    "in-flight request limit reached (backpressure)")
             self._pending[session] = _Pending(service_id, time.monotonic() + timeout, done)
         pend = self._pending[session]
         msg = Message(
@@ -443,6 +455,10 @@ class ClientV2:
         if not done.wait(ack_timeout):
             return False
         return True if result[0] else False
+
+    def resubscribe(self, service_id, instance_id):
+        """Re-emit SUBSCRIBE for an already-discovered service (recovery)."""
+        self._monitor.resubscribe(service_id, instance_id)
 
     # -- internal ----------------------------------------------------------
     def _next_session(self):

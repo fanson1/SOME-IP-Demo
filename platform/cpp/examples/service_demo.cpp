@@ -2,6 +2,7 @@
 #include "someip/app.hpp"
 #include "someip/config.hpp"
 #include "someip/log.hpp"
+#include "someip/watchdog.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -104,8 +105,11 @@ int main(int argc, char **argv) {
                 service.event_port(), service.sd_port());
 
     uint32_t speed = 0;
+    someip::watchdog::Watchdog wd(5.0, [&] { logger.error("publish loop stalled"); }, 0.2);
+    wd.start();
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
+        wd.pet();
         speed = (speed + 10) % 220;
         service.set_field(FIELD_SPEED, speed);
         const auto ts = uint32_t(std::time(nullptr));

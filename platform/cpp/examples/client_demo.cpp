@@ -2,6 +2,7 @@
 #include "someip/app.hpp"
 #include "someip/config.hpp"
 #include "someip/log.hpp"
+#include "someip/watchdog.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -34,8 +35,17 @@ int main(int argc, char **argv) {
         cfg.client.present ? cfg.client.client_id : 0x0001,
         cfg.client.present ? cfg.client.sd_port : cfg.sd.port,
         cfg.client.interface);
+    someip::watchdog::Watchdog wd(
+        3.0,
+        [&] {
+            logger.warn("event stream stalled; resubscribing");
+            client.resubscribe(SERVICE_ID, INSTANCE_ID);
+        },
+        0.2);
+    wd.start();
     client.on_event(EVENT_STATUS,
-                    [](uint16_t event_id, const std::vector<uint8_t> &p) {
+                    [&wd](uint16_t event_id, const std::vector<uint8_t> &p) {
+                        wd.pet();
                         if (p.size() != 8) {
                             return;
                         }
@@ -46,7 +56,8 @@ int main(int argc, char **argv) {
                         std::fflush(stdout);
                     });
     client.on_event(FIELD_SPEED + 2,
-                    [](uint16_t event_id, const std::vector<uint8_t> &p) {
+                    [&wd](uint16_t event_id, const std::vector<uint8_t> &p) {
+                        wd.pet();
                         if (p.size() != 4) {
                             return;
                         }
@@ -119,6 +130,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 12; ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
+    wd.stop();
     client.stop();
     std::printf("Done.\n");
     return 0;
