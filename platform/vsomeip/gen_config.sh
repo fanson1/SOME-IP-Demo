@@ -47,10 +47,12 @@ cfg = {
     ],
     # App client ports MUST stay distinct from hosted service endpoints:
     # someip-service is the in-process routing manager AND hosts 0x1234 on
-    # 30500, so its own client port is 30510; the client app uses 30511.
+    # 30500, so its own client port is 30510; the client app uses 30511,
+    # the bench app uses 30512.
     "applications": [
         {"name": "someip-service", "port": "30510"},
-        {"name": "someip-client", "port": "30511"}
+        {"name": "someip-client", "port": "30511"},
+        {"name": "someip-bench", "port": "30512"}
     ],
     "logging": {"level": "debug", "console": "true"},
 }

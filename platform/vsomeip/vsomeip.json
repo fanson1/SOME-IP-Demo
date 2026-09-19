@@ -14,7 +14,8 @@
     ],
     "applications": [
         { "name": "someip-service", "port": "30510" },
-        { "name": "someip-client",  "port": "30511" }
+        { "name": "someip-client",  "port": "30511" },
+        { "name": "someip-bench",   "port": "30512" }
     ],
     "logging": {
         "level": "debug",

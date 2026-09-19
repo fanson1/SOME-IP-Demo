@@ -102,28 +102,6 @@ jobs:
               --body-file /tmp/body.md
           fi
 
-      - name: Publish runtime failure log (debug)
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ ! -f /tmp/demo_ok ]; then exit 0; fi
-          if [ ! -s /tmp/client.log ] && [ ! -s /tmp/service.log ]; then exit 0; fi
-          {
-            echo "## vsomeip runtime failed (run ${{ github.run_id }}/${{ github.run_attempt }})"
-            if [ -s /tmp/client.log ]; then
-              echo '=== client.log ==='; echo '```text'
-              head -c 30000 /tmp/client.log; echo '```'
-            fi
-            if [ -s /tmp/service.log ]; then
-              echo '=== service.log (tail) ==='; echo '```text'
-              tail -c 30000 /tmp/service.log; echo '```'
-            fi
-          } > /tmp/body.md
-          gh issue create --repo "${GITHUB_REPOSITORY}" \
-            --title "vsomeip runtime debug (${{ github.run_id }}/${{ github.run_attempt }})" \
-            --body-file /tmp/body.md
-
       - name: Assert results
         run: |
           echo "===== client.log ====="
@@ -143,6 +121,31 @@ jobs:
           grep -q "BENCH PASS" /tmp/bench.log \
             || { echo "FAIL: bench"; tail -c 20000 /tmp/bench.log; exit 1; }
           echo "ALL CHECKS PASSED"
+
+      - name: Publish runtime failure log (debug)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f /tmp/demo_ok ]; then exit 0; fi
+          if [ ! -s /tmp/client.log ] && [ ! -s /tmp/service.log ] \
+             && [ ! -s /tmp/bench.log ]; then exit 0; fi
+          {
+            echo "## vsomeip runtime failed (run ${{ github.run_id }}/${{ github.run_attempt }})"
+            echo '======= bench.log ======='
+            if [ -s /tmp/bench.log ]; then echo '```text'; cat /tmp/bench.log; echo '```'; fi
+            if [ -s /tmp/client.log ]; then
+              echo '=== client.log ==='; echo '```text'
+              head -c 30000 /tmp/client.log; echo '```'
+            fi
+            if [ -s /tmp/service.log ]; then
+              echo '=== service.log (tail) ==='; echo '```text'
+              tail -c 30000 /tmp/service.log; echo '```'
+            fi
+          } > /tmp/body.md
+          gh issue create --repo "${GITHUB_REPOSITORY}" \
+            --title "vsomeip runtime debug (${{ github.run_id }}/${{ github.run_attempt }})" \
+            --body-file /tmp/body.md
 
       - name: Publish benchmark baseline (one-off, marker-gated)
         if: success() && hashFiles('platform/vsomeip/.bench-publish') != ''
