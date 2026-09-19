@@ -112,8 +112,10 @@ JSON 配置：`config/someip_demo.json`，demo 用 `-c/--config` 指定；日志
   全套单测 + 4 组合互操作矩阵 + RPC 基准全绿（`docs/bench_report.md` 基线）
 - ✅ 优雅关闭（stop 并 join 线程）、发布/事件 watchdog、在途请求背压上限 1024
 - ✅ 差距矩阵 `docs/vsomeip-gap-analysis.md`：P1 全部达成，P2 bench 入库，P3 为专项 backlog
-- ⏸ vsomeip 云端 CI 能完成源码编译与 demo 编译，运行阶段 availability 未触发（client.log 为空）；
-  bench 同场景对拍预留（见 `docs/bench_report.md`）
+- ✅ vsomeip 云端 CI（`platform/vsomeip`）：修复 SD 组播锚定 loopback 导致 availability 不触发
+  的问题（改用 `gen_config.sh` 按真实接口 IP 动态生成配置），Actions 全程断言
+  availability/GetVersion/Add/Speed/事件
+- ✅ bench 同场景对拍预留（见 `docs/bench_report.md`）
 - 已知差异：macOS 环境仅 UDP（无 TCP endpoint 集成测试）；多进程 daemon 模式在边界外
 
 ## 协议要点

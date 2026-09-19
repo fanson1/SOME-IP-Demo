@@ -55,12 +55,19 @@ jobs:
       - name: Run service + client
         working-directory: platform/vsomeip
         run: |
+          set -e -o pipefail
+          ./gen_config.sh vsomeip.json
+          echo "===== interfaces / config ====="
+          hostname -I || true
+          ip -4 -o addr show scope global || true
+          cat vsomeip.json
           export VSOMEIP_CONFIGURATION=$PWD/vsomeip.json
           ./build/service > /tmp/service.log 2>&1 &
           SVC=$!
           sleep 10
-          timeout 30 ./build/client | tee /tmp/client.log
+          timeout 30 ./build/client | tee /tmp/client.log || true
           kill $SVC 2>/dev/null || true
+          sleep 1
           echo "===== service.log ====="
           cat /tmp/service.log
 
@@ -91,7 +98,12 @@ jobs:
         run: |
           echo "===== client.log ====="
           cat /tmp/client.log
-          grep -q "is available" /tmp/client.log || { echo "FAIL: availability"; exit 1; }
+          if ! grep -q "is available" /tmp/client.log; then
+            echo "FAIL: availability"
+            echo "===== service.log (tail) ====="
+            tail -c 30000 /tmp/service.log
+            exit 1
+          fi
           grep -q "GetVersion" /tmp/client.log || { echo "FAIL: GetVersion"; exit 1; }
           grep -q "value=7" /tmp/client.log || { echo "FAIL: Add(3,4)"; exit 1; }
           grep -q "value=88" /tmp/client.log || { echo "FAIL: Speed=88"; exit 1; }

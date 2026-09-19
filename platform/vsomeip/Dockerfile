@@ -20,8 +20,10 @@ RUN curl -fsSL https://github.com/COVESA/vsomeip/archive/refs/tags/3.7.6.tar.gz 
 WORKDIR /app
 COPY . .
 
-RUN cmake -S . -B build && cmake --build build -j"$(nproc)"
+RUN chmod +x gen_config.sh entrypoint.sh \
+    && cmake -S . -B build && cmake --build build -j"$(nproc)"
 
 ENV VSOMEIP_CONFIGURATION=/app/vsomeip.json
 
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["./build/service"]

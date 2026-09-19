@@ -4,6 +4,7 @@
         "enable": true,
         "multicast": "224.244.224.245"
     },
+    "routing": "someip-service",
     "services": [
         {
             "service": "0x1234",
@@ -14,5 +15,9 @@
     "applications": [
         { "name": "someip-service", "port": "30500" },
         { "name": "someip-client",  "port": "30501" }
-    ]
+    ],
+    "logging": {
+        "level": "debug",
+        "console": "true"
+    }
 }
