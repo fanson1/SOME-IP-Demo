@@ -1,6 +1,8 @@
+import argparse
 import struct
 import time
 
+from someip import config
 from someip.app import SomeipServiceV2
 
 SERVICE_ID = 0x1234
@@ -14,13 +16,17 @@ EVENTGROUP_MAIN = 0x0001
 
 
 def main():
+    ap = argparse.ArgumentParser(description="SOME/IP v2 service demo")
+    ap.add_argument("-c", "--config", default=None, help="JSON config file")
+    args = ap.parse_args()
+    cfg = config.load_config(args.config) if args.config else None
+    kw = config.service_kwargs(cfg) if cfg else {}
     service = SomeipServiceV2(
-        service_id=SERVICE_ID,
-        instance_id=INSTANCE_ID,
-        major_version=0x01,
-        minor_version=0x00000001,
-        method_port=30500,
-        event_port=30501,
+        service_id=kw.pop("service_id", SERVICE_ID),
+        instance_id=kw.pop("instance_id", INSTANCE_ID),
+        major_version=kw.pop("major_version", 0x01),
+        minor_version=kw.pop("minor_version", 0x00000001),
+        **kw,
     )
 
     def get_version(_payload, _addr):

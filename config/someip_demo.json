@@ -1,0 +1,22 @@
+{
+  "unicast": "auto",
+  "sd": {
+    "port": 30490,
+    "multicast": "224.244.224.245",
+    "ttl": 3
+  },
+  "service": {
+    "service_id": "0x1234",
+    "instance_id": "0x5678",
+    "major_version": 1,
+    "minor_version": 1,
+    "method_port": 30500,
+    "event_port": 30501,
+    "interface": "auto"
+  },
+  "client": {
+    "client_id": "auto",
+    "sd_port": 30490,
+    "interface": "auto"
+  }
+}

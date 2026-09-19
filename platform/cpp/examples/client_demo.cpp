@@ -1,9 +1,11 @@
 // SOME/IP demo client (v2 app layer, mirrors platform/python/client_demo.py).
 #include "someip/app.hpp"
+#include "someip/config.hpp"
 
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -15,8 +17,18 @@ static constexpr uint16_t FIELD_SPEED = 0x1000;
 static constexpr uint16_t EVENT_STATUS = 0x8001;
 static constexpr uint16_t EVENTGROUP_MAIN = 0x0001;
 
-int main() {
-    someip::app::ClientV2 client(0x0001);
+int main(int argc, char **argv) {
+    someip::AppConfig cfg;
+    for (int i = 1; i < argc; ++i) {
+        const std::string a = argv[i];
+        if ((a == "-c" || a == "--config") && i + 1 < argc) {
+            cfg.load(argv[++i]);
+        }
+    }
+    someip::app::ClientV2 client(
+        cfg.client.present ? cfg.client.client_id : 0x0001,
+        cfg.client.present ? cfg.client.sd_port : cfg.sd.port,
+        cfg.client.interface);
     client.on_event(EVENT_STATUS,
                     [](uint16_t event_id, const std::vector<uint8_t> &p) {
                         if (p.size() != 8) {

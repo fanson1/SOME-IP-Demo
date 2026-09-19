@@ -1,42 +1,66 @@
 // SOME/IP demo service (v2 app layer, mirrors platform/python/service_demo.py).
 #include "someip/app.hpp"
+#include "someip/config.hpp"
 
 #include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
 #include <ctime>
+#include <string>
 #include <thread>
 #include <vector>
 
 using someip::MessageType;
 using someip::ReturnCode;
 
-static constexpr uint16_t SERVICE_ID = 0x1234;
-static constexpr uint16_t INSTANCE_ID = 0x5678;
+static constexpr uint16_t DEFAULT_SERVICE_ID = 0x1234;
+static constexpr uint16_t DEFAULT_INSTANCE_ID = 0x5678;
 static constexpr uint16_t METHOD_GET_VERSION = 0x0001;
 static constexpr uint16_t METHOD_ADD = 0x0002;
 static constexpr uint16_t FIELD_SPEED = 0x1000;
 static constexpr uint16_t EVENT_STATUS = 0x8001;
 static constexpr uint16_t EVENTGROUP_MAIN = 0x0001;
 
-int main() {
+int main(int argc, char **argv) {
+    someip::AppConfig cfg;
+    for (int i = 1; i < argc; ++i) {
+        const std::string a = argv[i];
+        if ((a == "-c" || a == "--config") && i + 1 < argc) {
+            cfg.load(argv[++i]);
+        }
+    }
+
+    const uint16_t service_id = cfg.service.present
+                                    ? uint16_t(cfg.service.service_id)
+                                    : DEFAULT_SERVICE_ID;
+    const uint16_t instance_id = cfg.service.present
+                                     ? uint16_t(cfg.service.instance_id)
+                                     : DEFAULT_INSTANCE_ID;
+    const uint8_t major = cfg.service.present ? cfg.service.major : 0x01;
+    const uint32_t minor = cfg.service.present ? cfg.service.minor : 1;
+
     someip::app::SomeipServiceV2 service(
-        SERVICE_ID, INSTANCE_ID, 0x01, 0x00000001, 30500, 30501);
+        service_id, instance_id, major, minor,
+        cfg.service.present ? cfg.service.method_port : 30500,
+        cfg.service.present ? cfg.service.event_port : 30501,
+        cfg.sd.port, cfg.service.interface);
 
     service.add_method(
-        METHOD_GET_VERSION, [](const std::vector<uint8_t> &, const sockaddr_in &) {
+        METHOD_GET_VERSION, [=](const std::vector<uint8_t> &, const sockaddr_in &) {
             std::vector<uint8_t> p(10);
-            p[0] = uint8_t(SERVICE_ID >> 24);
-            p[1] = uint8_t(SERVICE_ID >> 16);
-            p[2] = uint8_t(SERVICE_ID >> 8);
-            p[3] = uint8_t(SERVICE_ID);
-            p[4] = uint8_t(INSTANCE_ID >> 24);
-            p[5] = uint8_t(INSTANCE_ID >> 16);
-            p[6] = uint8_t(INSTANCE_ID >> 8);
-            p[7] = uint8_t(INSTANCE_ID);
-            p[8] = 1;  // major
-            p[9] = 0;  // minor
+            const uint32_t sid = service_id;
+            const uint32_t iid = instance_id;
+            p[0] = uint8_t(sid >> 24);
+            p[1] = uint8_t(sid >> 16);
+            p[2] = uint8_t(sid >> 8);
+            p[3] = uint8_t(sid);
+            p[4] = uint8_t(iid >> 24);
+            p[5] = uint8_t(iid >> 16);
+            p[6] = uint8_t(iid >> 8);
+            p[7] = uint8_t(iid);
+            p[8] = major;
+            p[9] = uint8_t(minor);
             return std::make_pair(uint8_t(ReturnCode::E_OK), std::move(p));
         });
 
@@ -57,13 +81,13 @@ int main() {
     service.start();
 
     std::printf("SOME/IP Service (v2) started:\n");
-    std::printf("  service_id    = 0x%04X\n", SERVICE_ID);
-    std::printf("  instance_id   = 0x%04X\n", INSTANCE_ID);
+    std::printf("  service_id    = 0x%04X\n", service_id);
+    std::printf("  instance_id   = 0x%04X\n", instance_id);
     std::printf("  method        = udp %s:%u\n", service.interface_ip().c_str(),
                 service.method_port());
     std::printf("  event         = udp %s:%u\n", service.interface_ip().c_str(),
                 service.event_port());
-    std::printf("  sd            = %s:%u\n", "224.244.224.245",
+    std::printf("  sd            = %s:%u\n", cfg.sd.multicast.c_str(),
                 service.sd_port());
     std::printf("  methods       = GetVersion(0x0001), Add(0x0002)\n");
     std::printf("  field         = Speed(0x1000, getter/setter/notifier)\n");

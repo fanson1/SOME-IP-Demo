@@ -1,6 +1,8 @@
+import argparse
 import struct
 import time
 
+from someip import config
 from someip.app import ClientV2
 
 SERVICE_ID = 0x1234
@@ -14,7 +16,12 @@ EVENTGROUP_MAIN = 0x0001
 
 
 def main():
-    client = ClientV2().start()
+    ap = argparse.ArgumentParser(description="SOME/IP v2 client demo")
+    ap.add_argument("-c", "--config", default=None, help="JSON config file")
+    args = ap.parse_args()
+    cfg = config.load_config(args.config) if args.config else None
+    kw = config.client_kwargs(cfg) if cfg else {}
+    client = ClientV2(**kw).start()
     client.on_event(EVENT_STATUS,
                     lambda event_id, payload: print(
                         "  [event 0x%04X] status: ts=%d speed=%d km/h"
