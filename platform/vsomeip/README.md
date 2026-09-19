@@ -55,6 +55,10 @@ cd platform/vsomeip
 cmake -S . -B build && cmake --build build
 ./gen_config.sh vsomeip.json          # 按本机接口 IP 生成配置
 export VSOMEIP_CONFIGURATION=$PWD/vsomeip.json
+# vsomeip 的 JSON 配置解析是动态加载的插件（libvsomeip-cfg.so），其依赖
+# libvsomeip 位于非默认前缀时需显式 LD_LIBRARY_PATH（源码安装到 /usr/local 时
+# 可改为 sudo ldconfig，仅需其一）：
+export LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 ./build/service &       # 终端1
 ./build/client          # 终端2
 ```

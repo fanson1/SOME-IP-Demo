@@ -61,6 +61,7 @@ jobs:
           hostname -I || true
           ip -4 -o addr show scope global || true
           cat vsomeip.json
+          export LD_LIBRARY_PATH=/tmp/vsomeip/dist/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
           export VSOMEIP_CONFIGURATION=$PWD/vsomeip.json
           ./build/service > /tmp/service.log 2>&1 &
           SVC=$!

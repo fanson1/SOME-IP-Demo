@@ -5,4 +5,5 @@ set -eu
 cd /app
 ./gen_config.sh vsomeip.json
 export VSOMEIP_CONFIGURATION=/app/vsomeip.json
+export LD_LIBRARY_PATH=/usr/local/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 exec "$@"
