@@ -95,7 +95,8 @@ def parse_entry(data):
         "minor_version": None,
     }
     if entry_type in (SdEntryType.SUBSCRIBE_EVENTGROUP,
-                      SdEntryType.SUBSCRIBE_EVENTGROUP_ACK):
+                      SdEntryType.SUBSCRIBE_EVENTGROUP_ACK,
+                      SdEntryType.SUBSCRIBE_EVENTGROUP_NACK):
         entry["eventgroup_id"] = _U16.unpack(tail[0:2])[0]
     else:
         entry["minor_version"] = _U32.unpack(tail)[0]

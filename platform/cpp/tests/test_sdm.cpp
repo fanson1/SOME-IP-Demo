@@ -108,7 +108,7 @@ static void test_publisher_backoff_and_find() {
         someip::sdm::encode_entry(someip::sdm::SdEntryType::FIND, 0x1234, 0x5678,
                                   0x01, 3, 0)};
     someip::Message find = someip::sdm::build_sd_message(find_entries, {}, 0x0001, 1);
-    pub.handle_datagram(find, "10.0.0.2");
+    pub.handle_datagram(find, "10.0.0.2", 30501);
     auto resp = pub.drain_pending();
     CHECK(resp.size() == 1);
     auto r_entries = someip::sdm::parse_sd_message(resp[0]);
@@ -124,20 +124,43 @@ static void test_publisher_subscribe_nack_and_stop() {
     std::vector<std::vector<uint8_t>> options = {
         someip::sdm::encode_option_ipv4("10.0.0.2", 30501)};
     someip::Message sub = someip::sdm::build_sd_message(sub_entries, options, 0x0001, 1);
-    pub.handle_datagram(sub, "10.0.0.2");
+    pub.handle_datagram(sub, "10.0.0.2", 30501);
     auto resp = pub.drain_pending();
     CHECK(resp.size() == 1);
     auto ack = someip::sdm::parse_sd_message(resp[0]);
     CHECK(ack[0].type == someip::sdm::SdEntryType::SUBSCRIBE_ACK);
     CHECK(ack[0].eventgroup_id == 0x0001);
-    CHECK(pub.subscribers(0x1234, 0x5678).count("10.0.0.2") == 1);
+    CHECK(pub.subscribers(0x1234, 0x5678).count({"10.0.0.2", 30501}) == 1);
+
+    // the SUBSCRIBE IPv4-endpoint option decides where notifications go
+    // (not the datagram source)
+    std::vector<std::vector<uint8_t>> src_too = {
+        someip::sdm::encode_option_ipv4("10.0.0.9", 30502)};
+    someip::Message sub2 = someip::sdm::build_sd_message(
+        {someip::sdm::encode_entry(someip::sdm::SdEntryType::SUBSCRIBE, 0x1234,
+                                   0x5678, 0x01, 3, 0, 0x0001, 0, 0, 1)},
+        src_too, 0x0001, 3);
+    pub.handle_datagram(sub2, "10.0.0.2", 30501);
+    pub.drain_pending();
+    CHECK(pub.subscribers(0x1234, 0x5678).count({"10.0.0.9", 30502}) == 1);
+
+    // datagram source fallback when the option is missing
+    std::vector<std::vector<uint8_t>> no_opt = {
+        someip::sdm::encode_option_ipv4("0.0.0.0", 0)};
+    someip::Message sub3 = someip::sdm::build_sd_message(
+        {someip::sdm::encode_entry(someip::sdm::SdEntryType::SUBSCRIBE, 0x1234,
+                                   0x5678, 0x01, 3, 0, 0x0001, 0, 0, 0)},
+        {}, 0x0001, 4);
+    pub.handle_datagram(sub3, "10.0.0.7", 30503);
+    pub.drain_pending();
+    CHECK(pub.subscribers(0x1234, 0x5678).count({"10.0.0.7", 30503}) == 1);
 
     // unknown group -> Nack
     std::vector<std::vector<uint8_t>> bad_entries = {
         someip::sdm::encode_entry(someip::sdm::SdEntryType::SUBSCRIBE, 0x1234,
                                   0x5678, 0x01, 3, 0, 0x0099, 0, 0, 1)};
-    someip::Message bad = someip::sdm::build_sd_message(bad_entries, options, 0x0001, 2);
-    pub.handle_datagram(bad, "10.0.0.2");
+    someip::Message bad = someip::sdm::build_sd_message(bad_entries, options, 0x0001, 5);
+    pub.handle_datagram(bad, "10.0.0.2", 30501);
     auto nack = someip::sdm::parse_sd_message(pub.drain_pending()[0]);
     CHECK(nack[0].type == someip::sdm::SdEntryType::SUBSCRIBE_NACK);
 
@@ -155,13 +178,13 @@ static void test_publisher_sawtooth() {
         {someip::sdm::encode_entry(someip::sdm::SdEntryType::FIND, 0x1234, 0x5678,
                                    0x01, 3, 0)},
         {}, 0x0001, 5);
-    pub.handle_datagram(find5, "10.0.0.2");
+    pub.handle_datagram(find5, "10.0.0.2", 30501);
     CHECK(pub.drain_pending().size() == 1);
     auto find3 = someip::sdm::build_sd_message(
         {someip::sdm::encode_entry(someip::sdm::SdEntryType::FIND, 0x1234, 0x5678,
                                    0x01, 3, 0)},
         {}, 0x0001, 3);
-    pub.handle_datagram(find3, "10.0.0.2");
+    pub.handle_datagram(find3, "10.0.0.2", 30501);
     CHECK(pub.drain_pending().empty());
 }
 
@@ -205,7 +228,7 @@ static void test_monitor_offer_and_subscribe() {
     CHECK(sub_entries[0].type == someip::sdm::SdEntryType::SUBSCRIBE);
 
     // publisher acks -> monitor fires callback
-    pub.handle_datagram(subs[0], "10.0.0.2");
+    pub.handle_datagram(subs[0], "10.0.0.2", 30501);
     auto acks = pub.drain_pending();
     CHECK(!acks.empty());
     mon.handle_datagram(acks[0], "10.0.0.5");
@@ -242,6 +265,63 @@ static void test_monitor_ttl_expiry_and_stop() {
     CHECK(unavailable == 2);
 }
 
+static void test_monitor_sub_state_and_resubscribe() {
+    FakeClock clock;
+    someip::sdm::ServiceMonitor mon(0x0001, clock);
+    mon.set_client_endpoint("10.0.0.2", 30501);
+    mon.find(0x1234, 0x5678, {0x0001});
+    CHECK(mon.wanted_eventgroups(0x1234, 0x5678).count(0x0001) == 1);
+    CHECK(mon.subscription_state(0x1234, 0x5678, 0x0001) ==
+          someip::sdm::ServiceMonitor::SubState::None);
+    CHECK(!mon.offer({0x1234, 0x5678}));
+
+    // service not discovered yet: resubscribe is a no-op
+    mon.resubscribe(0x1234, 0x5678);
+    CHECK(mon.drain_pending().empty());
+
+    someip::sdm::OfferedService o = make_service();
+    std::vector<std::vector<uint8_t>> entries = {
+        someip::sdm::encode_entry(someip::sdm::SdEntryType::OFFER, 0x1234, 0x5678,
+                                  o.major, 3, o.minor, 0xFFFF, 0, 0, 1)};
+    std::vector<std::vector<uint8_t>> options = {
+        someip::sdm::encode_option_ipv4(o.address.c_str(), o.port)};
+    someip::Message offer = someip::sdm::build_sd_message(entries, options, 0, 1);
+    mon.handle_datagram(offer, "10.0.0.5");
+    const someip::sdm::ServiceMonitor::Offer *rec = mon.offer({0x1234, 0x5678});
+    CHECK(rec != nullptr && rec->available && rec->port == o.port);
+
+    // offer already seen -> subscribed_ set + first SUBSCRIBE emitted
+    auto first = mon.drain_pending();
+    CHECK(!first.empty());
+
+    // simulate publisher ACK -> state goes Ack
+    someip::sdm::ServicePublisher pub({o}, clock);
+    pub.handle_datagram(first[0], "10.0.0.2", 30501);
+    auto acks = pub.drain_pending();
+    CHECK(!acks.empty());
+    mon.handle_datagram(acks[0], "10.0.0.5");
+    CHECK(mon.subscription_state(0x1234, 0x5678, 0x0001) ==
+          someip::sdm::ServiceMonitor::SubState::Ack);
+
+    // resubscribe when already subscribed emits nothing more
+    auto before = mon.drain_pending();
+    mon.resubscribe(0x1234, 0x5678);
+    auto after = mon.drain_pending();
+    CHECK(after.empty());
+
+    // NACK a different group -> state Nack
+    std::vector<std::vector<uint8_t>> nack_entries = {
+        someip::sdm::encode_entry(someip::sdm::SdEntryType::SUBSCRIBE_NACK,
+                                  0x1234, 0x5678, o.major, 3, 0, 0x0099)};
+    someip::Message nack =
+        someip::sdm::build_sd_message(nack_entries, {}, 0, 1);
+    mon.handle_datagram(nack, "10.0.0.5");
+    CHECK(mon.subscription_state(0x1234, 0x5678, 0x0099) ==
+          someip::sdm::ServiceMonitor::SubState::Nack);
+    CHECK(mon.subscription_state(0x1234, 0x5678, 0x0001) ==
+          someip::sdm::ServiceMonitor::SubState::Ack);
+}
+
 int main() {
     test_codec_golden();
     test_parse_message_roundtrip();
@@ -250,6 +330,7 @@ int main() {
     test_publisher_sawtooth();
     test_monitor_offer_and_subscribe();
     test_monitor_ttl_expiry_and_stop();
+    test_monitor_sub_state_and_resubscribe();
     if (failures == 0) {
         std::printf("C++ v2 sdm: ALL PASSED\n");
         return 0;

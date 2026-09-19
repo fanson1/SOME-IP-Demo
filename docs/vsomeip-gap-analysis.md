@@ -30,7 +30,9 @@ SIGINT/SIGTERM 优雅停止、多宿主/IPv6、发送缓冲与部分发送。
 | UDP/TCP 端点 | ✅ | ✅ transport | P0 |
 | SOME/IP-TP 分段/重组 | ✅ | ✅ tpc | P0 |
 | SD 完整状态机（Offer/Find/Subscribe Ack·Nack/StopOffer/TTL/退避） | ✅ | ✅ sdm | P0 |
-| 高层 API / demo | ✅ | ✅ app（Python v2 已迁移） | P0 |
+| app：v2 Service/Client API（lib） | ✅ | ✅ app（Python+C++ 双实现） | P0 |
+
+| 高层 demo / 互操作矩阵 | ✅ | ✅ 4 组合全绿（legacy 已退役） | P0 |
 | 多进程路由 / daemon | ✅ | ⛔ 边界内不做（单库式） | 差异 |
 | JSON 配置系统 | ✅（cfg） | ❌ 硬编码 | P1 |
 | 分级日志 + DLT | ✅ | ❌ printf | P1 |
@@ -73,8 +75,8 @@ vsomeip 对拍评测），**不等于"可装进量产 ECU 的认证软件"**—�
 - [x] tpc：SOME/IP-TP 分段/重组（会话 key=(service,method,client,session)、超时淘汰）
 - [x] sdm：SD 状态机（Offer/Find/Subscribe Ack/Nack、TTL 周期刷新与过期、
       指数退避、initial delay、StopOffer）
-- [x] app：v2 Service/Client API + demo 迁移（legacy 退役）
-- [ ] 互操作矩阵 v2：Python↔C++ 主栈 + legacy 全组合
+- [x] app：v2 Service/Client API + demo 迁移（Python + C++，legacy 退役）
+- [x] 互操作矩阵 v2：Python↔C++ 主栈 4 组合全绿
 - [x] 文档：`docs/vsomeip-gap-analysis.md`（本文件）
 
 ### P1 健壮性

@@ -48,6 +48,9 @@
 namespace someip {
 namespace sdm {
 
+inline constexpr uint16_t SD_PORT = 30490;
+inline constexpr const char *SD_MULTICAST_ADDRESS = "224.244.224.245";
+
 static constexpr uint16_t SD_SERVICE_ID = 0xFFFF;
 static constexpr uint16_t SD_METHOD_ID = 0x8100;
 static constexpr uint8_t SD_INTERFACE_VERSION = 0x01;
@@ -150,7 +153,8 @@ inline SdEntry parse_entry(const uint8_t *p, size_t n) {
     e.instance_id = uint16_t((p[6] << 8) | p[7]);
     e.major_version = p[8];
     e.ttl = (uint32_t(p[9]) << 16) | (uint32_t(p[10]) << 8) | uint32_t(p[11]);
-    if (e.type == SdEntryType::SUBSCRIBE || e.type == SdEntryType::SUBSCRIBE_ACK) {
+    if (e.type == SdEntryType::SUBSCRIBE || e.type == SdEntryType::SUBSCRIBE_ACK ||
+        e.type == SdEntryType::SUBSCRIBE_NACK) {
         e.eventgroup_id = uint16_t((p[12] << 8) | p[13]);
     } else {
         e.minor_version = (uint32_t(p[12]) << 24) | (uint32_t(p[13]) << 16) |
@@ -326,6 +330,19 @@ struct OfferedService {
     std::set<uint16_t> eventgroups;
 };
 
+// Subscriber identity = (host, port) datagram endpoint, taken from the
+// SUBSCRIBE IPv4-endpoint option (datagram source as fallback).
+struct Subscriber {
+    std::string host;
+    uint16_t port = 0;
+    bool operator<(const Subscriber &o) const {
+        return host != o.host ? host < o.host : port < o.port;
+    }
+    bool operator==(const Subscriber &o) const {
+        return host == o.host && port == o.port;
+    }
+};
+
 class ServicePublisher {
 public:
     using Clock = std::function<double()>;
@@ -366,7 +383,8 @@ public:
         return out;
     }
 
-    void handle_datagram(const Message &msg, const std::string &src_host) {
+    void handle_datagram(const Message &msg, const std::string &src_host,
+                         uint16_t src_port) {
         if (msg.header.service_id != SD_SERVICE_ID) {
             return;
         }
@@ -398,7 +416,24 @@ public:
                 case SdEntryType::SUBSCRIBE: {
                     const bool known = o.eventgroups.count(e.eventgroup_id) != 0;
                     if (known) {
-                        subscribers_[{o.service_id, o.instance_id}].insert(src_host);
+                        Subscriber target;
+                        bool have = false;
+                        for (const auto &opt : e.options) {
+                            if (opt.type == SdOptionType::IPV4_ENDPOINT) {
+                                auto ep = ipv4_endpoint(opt);
+                                if (!ep.first.empty()) {
+                                    target.host = ep.first;
+                                    target.port = ep.second;
+                                    have = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!have) {  // fall back to the datagram source
+                            target.host = src_host;
+                            target.port = src_port;
+                        }
+                        subscribers_[{o.service_id, o.instance_id}].insert(std::move(target));
                     }
                     std::vector<std::vector<uint8_t>> entries_b = {
                         encode_entry(known ? SdEntryType::SUBSCRIBE_ACK
@@ -422,8 +457,8 @@ public:
         return out;
     }
 
-    const std::set<std::string> &subscribers(uint16_t svc, uint16_t inst) {
-        static const std::set<std::string> empty;
+    const std::set<Subscriber> &subscribers(uint16_t svc, uint16_t inst) {
+        static const std::set<Subscriber> empty;
         auto it = subscribers_.find({svc, inst});
         return it == subscribers_.end() ? empty : it->second;
     }
@@ -474,7 +509,7 @@ private:
 
     Clock clock_;
     std::map<Key, ServiceDesc> services_;
-    std::map<Key, std::set<std::string>> subscribers_;
+    std::map<Key, std::set<Subscriber>> subscribers_;
     std::map<std::string, uint16_t> last_session_;
     std::vector<Message> pending_;
     std::mt19937 rng_{std::random_device{}()};
@@ -524,6 +559,43 @@ public:
     const Offer *offer(Key key) const {
         auto it = offers_.find(key);
         return it == offers_.end() ? nullptr : &it->second;
+    }
+
+    std::set<uint16_t> wanted_eventgroups(uint16_t service_id,
+                                          uint16_t instance_id) const {
+        auto it = wanted_.find({service_id, instance_id});
+        return it == wanted_.end() ? std::set<uint16_t>{} : it->second.eventgroups;
+    }
+
+    enum class SubState { None, Ack, Nack };
+
+    SubState subscription_state(uint16_t svc, uint16_t inst,
+                                uint16_t eventgroup_id) const {
+        const Key k{svc, inst};
+        if (acks_.count({svc, inst, eventgroup_id})) {
+            return SubState::Ack;
+        }
+        if (nacks_.count({svc, inst, eventgroup_id})) {
+            return SubState::Nack;
+        }
+        return SubState::None;
+    }
+
+    // (Re)emit SUBSCRIBE when the service is already known and available.
+    void resubscribe(uint16_t svc, uint16_t inst) {
+        const Key key{svc, inst};
+        auto oit = offers_.find(key);
+        if (oit == offers_.end() || !oit->second.available) {
+            return;
+        }
+        auto t = wanted_.find(key);
+        if (t == wanted_.end() || t->second.eventgroups.empty()) {
+            return;
+        }
+        if (subscribed_.find(key) == subscribed_.end()) {
+            subscribed_[key] = Subscription{clock_() + SOMEIP_SD_DEFAULT_TTL};
+            pending_.push_back(subscribe_message(key));
+        }
     }
 
     // Emit due FIND messages; stop advertising once a service is available.
@@ -584,6 +656,8 @@ public:
                     on_offer(key, e);
                     break;
                 case SdEntryType::SUBSCRIBE_ACK: {
+                    acks_.insert({key.first, key.second, e.eventgroup_id});
+                    nacks_.erase({key.first, key.second, e.eventgroup_id});
                     auto it = subscribed_.find(key);
                     if (it != subscribed_.end()) {
                         it->second.renew_at = clock_() + SOMEIP_SD_DEFAULT_TTL;
@@ -594,6 +668,8 @@ public:
                     break;
                 }
                 case SdEntryType::SUBSCRIBE_NACK:
+                    acks_.erase({key.first, key.second, e.eventgroup_id});
+                    nacks_.insert({key.first, key.second, e.eventgroup_id});
                     subscribed_.erase(key);
                     if (on_subscribe_nack_) {
                         on_subscribe_nack_(key.first, key.second, e.eventgroup_id);
@@ -714,6 +790,8 @@ private:
     std::map<Key, Target> wanted_;
     std::map<Key, Offer> offers_;
     std::map<Key, Subscription> subscribed_;
+    std::set<std::tuple<uint16_t, uint16_t, uint16_t>> acks_;
+    std::set<std::tuple<uint16_t, uint16_t, uint16_t>> nacks_;
     std::vector<Message> pending_;
     Callback on_available_;
     Callback on_unavailable_;
