@@ -2,7 +2,7 @@ import argparse
 import struct
 import time
 
-from someip import config
+from someip import config, log
 from someip.app import SomeipServiceV2
 
 SERVICE_ID = 0x1234
@@ -20,6 +20,9 @@ def main():
     ap.add_argument("-c", "--config", default=None, help="JSON config file")
     args = ap.parse_args()
     cfg = config.load_config(args.config) if args.config else None
+    if cfg and cfg["log"]["level"]:
+        log.set_default_level(cfg["log"]["level"])
+    logger = log.Logger("service_demo")
     kw = config.service_kwargs(cfg) if cfg else {}
     service = SomeipServiceV2(
         service_id=kw.pop("service_id", SERVICE_ID),
@@ -57,6 +60,8 @@ def main():
     print("  event         = Status(0x8001)")
     print("  eventgroup    = 0x0001")
     print("Waiting for clients... (Ctrl+C to quit)")
+    logger.info("listening method=%d event=%d sd=%d",
+                service.method_port, service.event_port, service.sd_port)
 
     speed = 0
     try:
@@ -68,6 +73,7 @@ def main():
             service.publish_event(EVENT_STATUS, payload)
     except KeyboardInterrupt:
         print("\nStopping service...")
+        logger.info("stopping service")
         service.stop()
 
 

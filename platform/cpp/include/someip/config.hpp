@@ -262,6 +262,7 @@ struct AppConfig {
     } client;
     std::string unicast;         // empty == auto
     std::string path;
+    std::string log_level;       // empty == default (info / env)
 
     static uint32_t euid(const std::string &s) {
         errno = 0;
@@ -306,6 +307,10 @@ struct AppConfig {
             if (const JsonValue *x = member(o, "port")) sd.port = u16("sd.port", x->as_int());
             if (const JsonValue *x = member(o, "multicast")) sd.multicast = x->as_string();
             if (const JsonValue *x = member(o, "ttl")) sd.ttl = u16("sd.ttl", x->as_int());
+        }
+        if (const JsonValue *v = root.find("log")) {
+            const auto &o = v->as_object();
+            if (const JsonValue *x = member(o, "level")) log_level = x->as_string();
         }
         if (const JsonValue *v = root.find("service")) {
             const auto &o = v->as_object();

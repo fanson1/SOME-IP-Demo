@@ -70,6 +70,7 @@ def normalize_config(raw):
     cfg = {
         "unicast": "auto",
         "sd": {"port": 30490, "multicast": "224.244.224.245", "ttl": 3},
+        "log": {"level": None},
         "service": None,
         "client": {"client_id": "auto", "sd_port": 30490, "interface": "auto"},
     }
@@ -84,6 +85,14 @@ def normalize_config(raw):
         cfg["sd"]["multicast"] = sd["multicast"]
     if "ttl" in sd:
         cfg["sd"]["ttl"] = _u16(sd["ttl"], "sd.ttl") or cfg["sd"]["ttl"]
+
+    log = raw.get("log") or {}
+    if not isinstance(log, dict):
+        raise ConfigError("log must be an object")
+    if "level" in log:
+        if not isinstance(log["level"], str):
+            raise ConfigError("log.level must be a string")
+        cfg["log"]["level"] = log["level"].lower()
 
     unicast = raw.get("unicast", "auto")
     if isinstance(unicast, bool) or not isinstance(unicast, str):

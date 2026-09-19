@@ -1,6 +1,7 @@
 // SOME/IP demo service (v2 app layer, mirrors platform/python/service_demo.py).
 #include "someip/app.hpp"
 #include "someip/config.hpp"
+#include "someip/log.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -39,6 +40,10 @@ int main(int argc, char **argv) {
                                      : DEFAULT_INSTANCE_ID;
     const uint8_t major = cfg.service.present ? cfg.service.major : 0x01;
     const uint32_t minor = cfg.service.present ? cfg.service.minor : 1;
+    someip::log::Logger logger("service_demo",
+                              cfg.log_level.empty()
+                                  ? someip::log::default_level()
+                                  : someip::log::level_from_name(cfg.log_level));
 
     someip::app::SomeipServiceV2 service(
         service_id, instance_id, major, minor,
@@ -95,6 +100,8 @@ int main(int argc, char **argv) {
     std::printf("  eventgroup    = 0x0001\n");
     std::printf("Waiting for clients... (Ctrl+C to quit)\n");
     std::fflush(stdout);
+    logger.info("listening method=%u event=%u sd=%u", service.method_port(),
+                service.event_port(), service.sd_port());
 
     uint32_t speed = 0;
     while (true) {

@@ -35,7 +35,7 @@ SIGINT/SIGTERM 优雅停止、多宿主/IPv6、发送缓冲与部分发送。
 | 高层 demo / 互操作矩阵 | ✅ | ✅ 4 组合全绿（legacy 已退役） | P0 |
 | 多进程路由 / daemon | ✅ | ⛔ 边界内不做（单库式） | 差异 |
 | JSON 配置系统 | ✅（cfg） | ✅ config（Python + C++ 双实现，vsomeip 子集） | P1 |
-| 分级日志 + DLT | ✅ | ❌ printf | P1 |
+| 分级日志 + DLT | ✅ | ✅ log（Python + C++，debug/info/warn/error，env/config） | P1 |
 | 优雅关闭 + watchdog + 背压 | ✅ | ❌ | P1 |
 | 性能基准 | ✅（CH 线程/nPDU/缓冲池） | ❌ bench 空 | P2 |
 | E2E 保护 | ✅（e2e） | ❌（未规划细节） | P3 backlog |
@@ -83,7 +83,9 @@ vsomeip 对拍评测），**不等于"可装进量产 ECU 的认证软件"**—�
 - [x] config：JSON 加载（vsomeip schema 子集：unicast/端口/SD 参数）
   Python `someip/config.py` + C++ 头文件 `someip/config.hpp`（零依赖 RFC 8259 子集
   解析器），demo 支持 `-c/--config`；`config/someip_demo.json` 样例。
-- [ ] log：分级 logger（debug/info/warn/error，组件前缀）
+- [x] log：分级 logger（debug/info/warn/error，组件前缀，stderr）
+  Python `someip/log.py` + C++ `someip/log.hpp`（线程安全）；级别由
+  `SOMEIP_LOG_LEVEL` 环境变量或 config `log.level` 指定。
 - [ ] 优雅关闭（join 线程、资源释放）+ offer watchdog
 - [ ] 发送背压与缓冲上限（防内存耗尽）
 

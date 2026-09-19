@@ -2,7 +2,7 @@ import argparse
 import struct
 import time
 
-from someip import config
+from someip import config, log
 from someip.app import ClientV2
 
 SERVICE_ID = 0x1234
@@ -20,6 +20,9 @@ def main():
     ap.add_argument("-c", "--config", default=None, help="JSON config file")
     args = ap.parse_args()
     cfg = config.load_config(args.config) if args.config else None
+    if cfg and cfg["log"]["level"]:
+        log.set_default_level(cfg["log"]["level"])
+    logger = log.Logger("client_demo")
     kw = config.client_kwargs(cfg) if cfg else {}
     client = ClientV2(**kw).start()
     client.on_event(EVENT_STATUS,
@@ -38,6 +41,8 @@ def main():
                                    eventgroups=(EVENTGROUP_MAIN,),
                                    timeout=10):
         print("Service not found, is service_demo.py running?")
+        logger.error("service 0x%04X/0x%04X not found within 10s",
+                     SERVICE_ID, INSTANCE_ID)
         client.stop()
         return
     ip, port = client.discovered_endpoint(SERVICE_ID, INSTANCE_ID)

@@ -1,6 +1,7 @@
 // SOME/IP demo client (v2 app layer, mirrors platform/python/client_demo.py).
 #include "someip/app.hpp"
 #include "someip/config.hpp"
+#include "someip/log.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -25,6 +26,10 @@ int main(int argc, char **argv) {
             cfg.load(argv[++i]);
         }
     }
+    someip::log::Logger logger("client_demo",
+                              cfg.log_level.empty()
+                                  ? someip::log::default_level()
+                                  : someip::log::level_from_name(cfg.log_level));
     someip::app::ClientV2 client(
         cfg.client.present ? cfg.client.client_id : 0x0001,
         cfg.client.present ? cfg.client.sd_port : cfg.sd.port,
@@ -56,6 +61,7 @@ int main(int argc, char **argv) {
     if (!client.wait_for_service(SERVICE_ID, INSTANCE_ID,
                                  {EVENTGROUP_MAIN}, 10.0)) {
         std::printf("Service not found, is service_demo running?\n");
+        logger.error("service not found: same multicast/unicast required");
         client.stop();
         return 1;
     }
