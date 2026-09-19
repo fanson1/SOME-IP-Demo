@@ -82,9 +82,16 @@ Service 0x1234/0x5678 is available
   Homebrew 在本机无 bottle（走源码构建需升级 CLT），且本机访问 GitHub 大文件约 10KB/s，
   因此采用 **云端/容器** 作为执行环境。
 - Ubuntu 官方仓库**未打包** vsomeip（Debian 有），故 Docker/Actions 均改为先 **git clone vsomeip 3.7.6 源码编译安装**，再编译本 demo。
-- 此前云端 CI 在 “service/client 跑起来但 availability 未触发（client.log 为空）”：根因是配置
-  `unicast=127.0.0.1` 导致 SD 组播监听锚定 loopback，实测报文经真实网卡发出后无法回环。已改为
-  `gen_config.sh` 动态生成与运行环境一致的配置（见上），Actions/Docker/原生三处统一使用。
+- 云端 CI 此前全红，排查出三处根因并已修复，Actions 现已全绿：
+  1. **SD 组播锚定 loopback**：`unicast=127.0.0.1` 使组播加入在 loopback，FIND/OFFER 从真实
+     网卡发出后无法回环 → availability 不触发。改由 `gen_config.sh` 动态生成真实接口 IP。
+  2. **配置模块加载失败**（`Configuration module could not be loaded!`，服务启动即退出）：
+     vsomeip 的 JSON 解析是 dlopen 加载的插件 `libvsomeip-cfg.so`，其依赖 `libvsomeip.so.3`
+     位于非默认前缀，需 `LD_LIBRARY_PATH` 显式给出（demo 二进制靠 RPATH 能跑，插件不能）。
+  3. **路由 manager 端口与托管服务端点端口同址**：`someip-service` 既作进程内路由 manager
+     又托管服务 0x1234@30500，其自身 client 端口改为 30510，client 应用 30511，避免同址冲突。
+- 诊断手段：CI 失败时自动把 client.log / service.log 发到 GitHub issue（Actions 内 gh create），
+  无需额外权限即可事后定位。
 
 ## 与手写实现的关系
 
