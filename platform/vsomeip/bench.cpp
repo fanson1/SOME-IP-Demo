@@ -1,75 +1,46 @@
 // vsomeip RPC latency/throughput benchmark (P2 parity with benchmarks/bench_rpc.py).
 //
-// Measures sequential round-trip latency (avg/p50/p90) for the Add method and
-// derives throughput; prints a stable machine-readable block:
+// Strictly sequential round trips: exactly one request in flight, we wait for
+// the next REQUEST response before sending again, no session correlation
+// required (the response handler only flips a flag). Mirrors the methodology of
+// bencchmarks/bench_rpc.py (send, wait for the single outstanding reply, time
+// it) so the numbers are comparable. Prints a stable machine-readable block:
 //   rtt_avg_ms=... rtt_p50_ms=... rtt_p90_ms=... req_per_s=... completed=N/N
 //   BENCH PASS
-// The exact same scenario family (RTT + derived req/s over one host, in-process
-// routing manager) is what the hand-written Python stack benchmarks.
 #include <vsomeip/vsomeip.hpp>
 
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
-#include <map>
 #include <memory>
-#include <mutex>
 #include <numeric>
 #include <thread>
 #include <vector>
 
-static const vsomeip::service_t  SERVICE_ID = 0x1234;
+static const vsomeip::service_t  SERVICE_ID  = 0x1234;
 static const vsomeip::instance_t INSTANCE_ID = 0x5678;
-static const vsomeip::method_t   METHOD_ADD = 0x0002;
+static const vsomeip::method_t   METHOD_ADD  = 0x0002;
 static const size_t N = 100;
 
 static std::shared_ptr<vsomeip::application> g_app;
 static std::atomic<bool> g_started{false};
-static std::atomic<size_t> g_got{0};
-
-struct Pending {
-    std::chrono::steady_clock::time_point start;
-    bool done = false;
-    std::mutex m;
-    std::condition_variable cv;
-};
-
-static std::mutex g_pending_mx;
-static std::map<uint64_t, std::shared_ptr<Pending>> g_pending;
+static std::atomic<bool> g_ready{false};
+static std::atomic<size_t> g_received_any{0};
 static std::vector<double> g_rtt_ms;
 
 static void on_response(const std::shared_ptr<vsomeip::message> &response) {
-    if (response->get_method() != METHOD_ADD) {
-        return;
+    g_received_any.fetch_add(1);
+    if (response->get_method() == METHOD_ADD &&
+        response->get_message_type() == vsomeip::message_type_e::MT_RESPONSE) {
+        g_ready.store(true);
     }
-    std::shared_ptr<Pending> p;
-    {
-        std::lock_guard<std::mutex> lk(g_pending_mx);
-        auto it = g_pending.find(response->get_request());
-        if (it == g_pending.end()) {
-            return;
-        }
-        p = it->second;
-        g_pending.erase(it);
-    }
-    {
-        std::lock_guard<std::mutex> lk(p->m);
-        p->done = true;
-    }
-    p->cv.notify_all();
-    const double ms = std::chrono::duration<double, std::milli>(
-        std::chrono::steady_clock::now() - p->start).count();
-    {
-        std::lock_guard<std::mutex> lk(g_pending_mx);
-        g_rtt_ms.push_back(ms);
-    }
-    g_got.fetch_add(1);
 }
 
 static void run_bench() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    const auto bench_start = std::chrono::steady_clock::now();
     size_t completed = 0;
     for (size_t i = 0; i < N; ++i) {
         auto request = vsomeip::runtime::get()->create_request();
@@ -81,47 +52,41 @@ static void run_bench() {
         payload->set_data(bytes);
         request->set_payload(payload);
 
-        auto p = std::make_shared<Pending>();
-        p->start = std::chrono::steady_clock::now();
-        {
-            std::lock_guard<std::mutex> lk(g_pending_mx);
-            g_pending[request->get_request()] = p;
-        }
+        g_ready.store(false);
+        const auto t0 = std::chrono::steady_clock::now();
         g_app->send(request);
-        std::unique_lock<std::mutex> lk(p->m);
-        if (p->cv.wait_for(lk, std::chrono::seconds(2), [&] { return p->done; })) {
+        auto deadline = t0 + std::chrono::milliseconds(300);
+        while (!g_ready.load()) {
+            if (std::chrono::steady_clock::now() >= deadline) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        const double ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - t0).count();
+        if (g_ready.load()) {
             ++completed;
-        } else {
-            std::lock_guard<std::mutex> pmx(g_pending_mx);
-            g_pending.erase(request->get_request());
+            g_rtt_ms.push_back(ms);
         }
     }
-    while (g_got.load() != completed) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(2));
-    }
-}
+    const double wall_s = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - bench_start).count();
+    const size_t received = g_received_any.load();
 
-static void print_stats() {
-    std::vector<double> v;
-    {
-        std::lock_guard<std::mutex> lk(g_pending_mx);
-        v = g_rtt_ms;
-    }
-    if (v.size() != N) {
-        std::printf("completed=%zu/%zu BENCH FAIL (rtt samples=%zu)\n",
-                    v.size(), N, v.size());
+    if (completed != N) {
+        std::printf("completed=%zu/%zu BENCH FAIL (received_any=%zu rtt_samples=%zu)\n",
+                    completed, N, received, g_rtt_ms.size());
         g_app->stop();
         return;
     }
+
+    std::vector<double> v = g_rtt_ms;
     std::sort(v.begin(), v.end());
-    const double sum = std::accumulate(v.begin(), v.end(), 0.0);
-    const double avg = sum / v.size();
+    const double avg = std::accumulate(v.begin(), v.end(), 0.0) / v.size();
     const double p50 = v[v.size() / 2];
     const double p90 = v[size_t(v.size() * 0.9)];
     std::printf("rtt_avg_ms=%.3f rtt_p50_ms=%.3f rtt_p90_ms=%.3f "
-                "req_per_s=%.1f\n",
-                avg, p50, p90, 1000.0 / avg);
+                "req_per_s=%.1f\n", avg, p50, p90, 1000.0 / avg);
     std::printf("completed=%zu/%zu\n", v.size(), N);
+    std::printf("benched_received_any=%zu wall_s=%.3f\n", received, wall_s);
     std::printf("BENCH PASS\n");
     std::fflush(stdout);
     g_app->stop();
@@ -130,17 +95,8 @@ static void print_stats() {
 static void on_availability(vsomeip::service_t service, vsomeip::instance_t instance,
                             bool available) {
     if (available && !g_started.exchange(true)) {
-        std::printf("Service 0x%04X/0x%04X is available (bench)\n", service,
-                    instance);
-        std::thread([] {
-            const auto t0 = std::chrono::steady_clock::now();
-            run_bench();
-            const double total_s =
-                std::chrono::duration<double>(std::chrono::steady_clock::now() - t0)
-                    .count();
-            std::printf("wall_s=%.3f\n", total_s);
-            print_stats();
-        }).detach();
+        std::printf("Service 0x%04X/0x%04X is available (bench)\n", service, instance);
+        std::thread([] { run_bench(); }).detach();
     }
 }
 
