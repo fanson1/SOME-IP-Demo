@@ -42,7 +42,7 @@ jobs:
           cmake --install /tmp/vsomeip-src/build
           touch /tmp/build_ok
 
-      - name: Build demo (service + client)
+      - name: Build demo (service + client + bench)
         run: |
           set -e -o pipefail
           exec > >(tee /tmp/demo-build.log) 2>&1
@@ -72,6 +72,8 @@ jobs:
             exit 1
           fi
           timeout 30 ./build/client | tee /tmp/client.log || true
+          echo "===== bench (sequential RTT, N=100) ====="
+          timeout 60 ./build/bench | tee /tmp/bench.log || true
           kill $SVC 2>/dev/null || true
           sleep 1
           echo "===== service.log ====="
@@ -136,4 +138,24 @@ jobs:
           grep -q "value=7" /tmp/client.log || { echo "FAIL: Add(3,4)"; exit 1; }
           grep -q "value=88" /tmp/client.log || { echo "FAIL: Speed=88"; exit 1; }
           grep -q "event 0x8001\|speed field" /tmp/client.log || { echo "FAIL: event"; exit 1; }
+          echo "===== bench.log ====="
+          cat /tmp/bench.log
+          grep -q "BENCH PASS" /tmp/bench.log \
+            || { echo "FAIL: bench"; tail -c 20000 /tmp/bench.log; exit 1; }
           echo "ALL CHECKS PASSED"
+
+      - name: Publish benchmark baseline (one-off, marker-gated)
+        if: success() && hashFiles('platform/vsomeip/.bench-publish') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -s /tmp/bench.log ] || exit 0
+          {
+            echo "## vsomeip same-scenario benchmark (run ${{ github.run_id }}/${{ github.run_attempt }})"
+            echo '```text'
+            cat /tmp/bench.log
+            echo '```'
+          } > /tmp/body.md
+          gh issue create --repo "${GITHUB_REPOSITORY}" \
+            --title "vsomeip bench baseline (${{ github.run_id }})" \
+            --body-file /tmp/body.md

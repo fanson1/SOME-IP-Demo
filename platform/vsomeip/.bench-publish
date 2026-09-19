@@ -1,0 +1,2 @@
+# One-off: publishes the next successful benchmark baseline to a GitHub issue
+# (workflow step is gated on this file existing; delete it to disable).

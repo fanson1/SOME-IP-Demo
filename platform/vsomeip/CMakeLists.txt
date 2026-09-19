@@ -36,4 +36,7 @@ target_link_libraries(service ${VSOMEIP_TARGETS} Threads::Threads)
 add_executable(client client.cpp)
 target_link_libraries(client ${VSOMEIP_TARGETS} Threads::Threads)
 
-install(TARGETS service client RUNTIME DESTINATION bin)
+add_executable(bench bench.cpp)
+target_link_libraries(bench ${VSOMEIP_TARGETS} Threads::Threads)
+
+install(TARGETS service client bench RUNTIME DESTINATION bin)
