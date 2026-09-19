@@ -53,7 +53,7 @@ platform/cpp/include/someip/legacy/  # v1 兼容层（C++11，namespace someip::
 platform/cpp/{tests,examples}  Makefile  CMakeLists.txt
 tests/   互操作与单测脚本（tests/run_interop_matrix.sh，python3 -m unittest discover -s tests -p 'test_py_*.py'）
 scripts/ 一键全面测试（scripts/run_all.sh）
-bench/   性能基准（bench/bench_rpc.py + bench_report，预留）
+bench/   性能基准（benchmarks/bench_rpc.py + bench_report，含 vsomeip 对拍表）
 platform/vsomeip/              # 量产对照栈（COVESA vsomeip，Linux/容器/云端 CI）
 ```
 

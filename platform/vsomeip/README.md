@@ -15,6 +15,7 @@
 platform/vsomeip/
 ├── service.cpp      # 发布方：GetVersion/Add Method + Speed Field + Status Event
 ├── client.cpp       # 订阅方：SD 发现 -> RPC -> 订阅事件
+├── bench.cpp        # RPC 基准：N=100 顺序往返，RTT p50/p90 + req/s（CI 断言 BENCH PASS）
 ├── vsomeip.json     # 单机配置模板（unicast 会被 gen_config.sh 按主机重写）
 ├── gen_config.sh    # 按本机主接口 IP 生成 vsomeip.json（SD 组播依赖真实接口）
 ├── entrypoint.sh    # 容器入口：先根据运行时网络命名空间再生成配置再 exec

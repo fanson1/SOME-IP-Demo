@@ -1,7 +1,7 @@
 # 性能基准基线（bench_report）
 
 `benchmarks/bench_rpc.py` 对 v2 栈（Python）做本机对拍：反复执行、观察波动、把较稳数据
-作为基线。vsomeip 侧预留同场景对拍（P2 预留项，见 `docs/vsomeip-gap-analysis.md`）。
+作为基线。vsomeip 侧同场景对拍已完成，结果见「与 vsomeip 对拍」。（`docs/vsomeip-gap-analysis.md`）
 
 ## 方法
 
@@ -36,8 +36,37 @@ python3 -u benchmarks/bench_rpc.py --min-inflight-once 500
 | --- | --- | --- | --- | --- | --- |
 | 2026-09-19 | 0.44 | 0.23 | 0.43 | 2060 | 基线入库 |
 
-## 与 vsomeip 对拍（预留）
+## 与 vsomeip 对拍（完成，2026-09-19）
 
-- 同场景：`platform/vsomeip`（容器/云端）跑同样的顺序往返/并发吞吐/丢包恢复，
-  结果写入本报告的对比表。
-- 环境差异注明：vsomeip 跑 Linux 容器与 UDP/TCP endpoint，本机 v2 仅 UDP。
+同场景：`Add(3,4)` 顺序往返、完整 SD 发现；vsomeip 侧走进程内路由 manager（in-process
+routing，本地 UDS 承载）。vsomeip 基准由 `platform/vsomeip/bench.cpp` 在**云端 CI
+（ubuntu-latest VM，C++）**产出并持续断言 `BENCH PASS`；v2 基准在本机
+（macOS 12.7.6 Intel，CPython 3.9.2）由 `benchmarks/bench_rpc.py` 产出。
+
+| 指标 | v2（本机，Python） | vsomeip 3.7.6（CI VM，C++） |
+| --- | --- | --- |
+| RTT 平均值 | 0.44 ms | 1.08 ms |
+| p50 | 0.23 ms | 1.08 ms |
+| p90 | 0.43 ms | 1.09 ms |
+| 吞吐 | ~2060 req/s（16 worker 并发） | 923 req/s（单在途顺序推算 1000/avg） |
+
+口径与可比性说明：
+
+- **环境不同**：v2 在本机 macOS 上经真实 UDP 端点（Python 解释执行）；vsomeip 在 CI 虚拟机上
+  （C++，进程内 RM + UDS）。两者不是同一台/同一栈，绝对值仅作工程参考。
+- **吞吐口径不同**：v2 为并发吞吐（16 worker），vsomeip 为顺序单在途推算（1000/rtt_avg），
+  不宜直接相除比较；延迟基准（p50/p90）方法一致（顺序往返）可比。
+- **可复现**：vsomeip 每次 CI 都会跑 bench 并断言 `BENCH PASS`；本机可用
+  `platform/vsomeip/bench.cpp` 复跑（`./build/bench`，N=100，单次 0.3s 超时）。
+- vsomeip 首版 bench 用 `get_request()` 预存 session 做关联而全部超时：vsomeip 的
+  client/session 在 `send()` 时才由路由层分配，读取时机错误导致响应无法回关联（issue #6）。
+  已改为「单在途 + 收到即置位」的 flag 方案（与 bench_rpc.py 相同方法论），100/100 通过。
+
+复现命令：
+
+```bash
+# v2
+python3 -u benchmarks/bench_rpc.py
+# vsomeip（需 Linux + vsomeip 构建产物）
+./gen_config.sh vsomeip.json && export VSOMEIP_CONFIGURATION=$PWD/vsomeip.json && ./build/bench
+```
